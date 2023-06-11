@@ -1,0 +1,9 @@
+[package]
+name = "lokinit"
+version = "0.1.0"
+edition = "2021"
+description = "The smallest cross-platform native windowing library."
+license = "MIT/Apache-2.0"
+authors = ["The Loki Authors"]
+keywords = ["windowing"]
+categories = ["gui"]
