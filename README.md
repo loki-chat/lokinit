@@ -1,8 +1,15 @@
-# Lokinit
+<p align="center">
+  <h1 align="center">Lokinit</h1>
+  <div align="center">
+    The smallest cross-platform native windowing library.
+    &nbsp;
+    <a align="center" href="https://discord.gg/D5pzrmyqz3">
+      <img align="center" src="https://img.shields.io/discord/1092477105079595038?color=7289DA&label=%20&logo=discord&logoColor=white" alt="Discord" />
+    </a>
+  </div>
+</p>
 
-> The smallest cross-platform native windowing library.
-
-[![Discord](https://img.shields.io/discord/1092477105079595038?color=7289DA&label=%20&logo=discord&logoColor=white)](https://discord.gg/D5pzrmyqz3)
+&nbsp;
 
 Lokinit is the smallest cross-platform native windowing library for Rust. Its goal is to bring a window to the screen on all major operating systems, with a dependency tree as minimal as it should be, and code that is simple and straightforward.
 
