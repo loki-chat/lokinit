@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::ffi::{c_char, c_int, c_void, CStr};
 
 // https://github.com/nagisa/rust_libloading/blob/master/src/os/unix/consts.rs

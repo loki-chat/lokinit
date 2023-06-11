@@ -54,19 +54,19 @@ pub enum LoadingError {
 macro_rules! library {
     (
         [ $lib:ident <-> $name:literal ] ;
-        $( fn $fn:ident ( $( $arg:ident : $t:ty ),* ) $(-> $res:ty)? );* ;
+        $( pub fn $fn:ident $args:tt $(-> $res:ty)? );* ;
     ) => {
         pub struct $lib {
-            $(pub $fn: unsafe fn($($arg: $t),*)$( -> $res)?,)*
+            $(pub $fn: unsafe extern "C" fn$args$( -> $res)?,)*
         }
 
         impl $lib {
-            pub fn new() -> Result<Self, $crate::native::linux::dl::LoadingError> {
-                let lib = $crate::native::linux::dl::Library::new($name)
-                    .map_err($crate::native::linux::dl::LoadingError::Library)?;
+            pub fn new() -> Result<Self, $crate::native::linux::LoadingError> {
+                let lib = $crate::native::linux::Library::new($name)
+                    .map_err($crate::native::linux::LoadingError::Library)?;
 
                 Ok(Self {
-                    $($fn: lib.get_sym(stringify!($fn)).map_err($crate::native::linux::dl::LoadingError::Symbol)?,)*
+                    $($fn: lib.get_sym(stringify!($fn)).map_err($crate::native::linux::LoadingError::Symbol)?,)*
                 })
             }
         }
