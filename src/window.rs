@@ -1,3 +1,5 @@
+use crate::core::MonitorId;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct WindowPos {
     x: u32,
@@ -15,6 +17,8 @@ pub struct WindowBuilder {
     title: String,
     position: WindowPos,
     size: WindowSize,
+    monitor: Option<MonitorId>,
+    centered: bool,
     resizable: bool,
     maximized: bool,
     fullscreen: bool,
@@ -27,8 +31,8 @@ impl WindowBuilder {
         Self::default()
     }
 
-    pub fn title(mut self, title: String) -> Self {
-        self.title = title;
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
         self
     }
 
@@ -39,6 +43,16 @@ impl WindowBuilder {
 
     pub fn size(mut self, width: u32, height: u32) -> Self {
         self.size = WindowSize { width, height };
+        self
+    }
+
+    pub fn monitor(mut self, monitor: MonitorId) -> Self {
+        self.monitor = Some(monitor);
+        self
+    }
+
+    pub fn centered(mut self, is_centered: bool) -> Self {
+        self.centered = is_centered;
         self
     }
 

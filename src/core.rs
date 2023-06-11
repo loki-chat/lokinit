@@ -17,27 +17,27 @@ pub struct Monitor {
 pub struct LokinitCore;
 
 impl LokinitCore {
-    fn init() -> Self {
+    pub fn init() -> Self {
         todo!()
     }
 
-    fn fetch_monitors() -> Vec<Monitor> {
+    pub fn fetch_monitors() -> Vec<Monitor> {
         todo!()
     }
 
-    fn create_window(&mut self, builder: WindowBuilder) -> WindowHandle {
+    pub fn create_window(&mut self, builder: WindowBuilder) -> WindowHandle {
         todo!()
     }
 
-    fn poll_event(&mut self) -> Option<(WindowHandle, Event)> {
+    pub fn poll_event(&mut self) -> Option<(WindowHandle, Event)> {
         todo!()
     }
 
-    fn window_pos(&self, window: WindowHandle) -> WindowPos {
+    pub fn window_pos(&self, window: WindowHandle) -> WindowPos {
         todo!()
     }
 
-    fn window_size(&self, window: WindowHandle) -> WindowSize {
+    pub fn window_size(&self, window: WindowHandle) -> WindowSize {
         todo!()
     }
 }
