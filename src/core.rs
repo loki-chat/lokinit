@@ -1,8 +1,13 @@
 #![allow(unused)]
 
-use crate::event::{Event, EventKind};
-use crate::native;
-use crate::window::{ScreenMode, WindowBuilder, WindowHandle, WindowPos, WindowSize};
+use {
+    crate::{
+        event::Event,
+        native::{CreateWindowError, NativeCoreError},
+        window::{WindowBuilder, WindowHandle, WindowPos, WindowSize},
+    },
+    std::{cell::RefCell, rc::Rc},
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MonitorId(usize);
@@ -15,45 +20,51 @@ pub struct Monitor {
     hertz: u32,
 }
 
-pub struct LokinitCore(#[cfg(target_os = "linux")] native::linux::x11::X11NativeCore);
+pub use crate::native::LokinitCore;
+thread_local! {
+    // pub static INSTANCE: Rc<RefCell<Option<LokinitCore>>> = Rc::new(RefCell::new(None));
+    pub static INSTANCE: RefCell<Option<LokinitCore>> = RefCell::new(None);
+}
 
-#[cfg(target_os = "linux")]
-impl LokinitCore {
-    pub fn init() -> Result<Self, native::linux::x11::NativeCoreError> {
-        let native_core = unsafe { native::linux::x11::X11NativeCore::init() }?;
-        Ok(Self(native_core))
-    }
+pub fn with<R>(callback: impl FnOnce(&mut LokinitCore) -> R) -> R {
+    INSTANCE.with(|instance| {
+        let mut instance = instance.borrow_mut();
 
-    pub fn fetch_monitors() -> Vec<Monitor> {
-        todo!()
-    }
+        if instance.is_none() {
+            *instance = Some(LokinitCore::init());
+        }
 
-    pub fn create_window(
-        &mut self,
-        builder: WindowBuilder,
-    ) -> Result<WindowHandle, native::linux::x11::CreateWindowError> {
-        unsafe { self.0.create_window(builder) }
-    }
+        callback(instance.as_mut().unwrap())
+    })
+}
 
-    /// Poll an event. This function is blocking while waiting for the next event,
-    /// and returns `None` when the application requested to quit.
-    pub fn poll_event(&mut self) -> Option<Event> {
-        unsafe { self.0.poll_event() }
-    }
+pub fn create_window(builder: WindowBuilder) -> Result<WindowHandle, CreateWindowError> {
+    with(|instance| instance.create_window(builder))
+}
 
-    pub fn window_pos(&self, window: WindowHandle) -> WindowPos {
-        self.0.window_pos(window)
-    }
+pub fn poll_event() -> Option<Event> {
+    with(|instance| instance.poll_event())
+}
 
-    pub fn window_size(&self, window: WindowHandle) -> WindowSize {
-        self.0.window_size(window)
-    }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::any::{Any, TypeId};
 
-    pub fn screen_mode(&self, window: WindowHandle) -> bool {
-        todo!()
-    }
+    /// Make sure the native core impl supports all methods, and that they return the correct type
+    #[test]
+    fn core_has_all_methods() {
+        let mut core = LokinitCore::init();
+        let window = core.create_window(WindowBuilder::default());
+        let monitors = LokinitCore::fetch_monitors();
+        let event = core.poll_event();
 
-    pub fn set_screen_mode(&mut self, window: WindowHandle, screen_mode: ScreenMode) {
-        todo!()
+        assert_eq!(core.type_id(), TypeId::of::<LokinitCore>());
+        assert_eq!(window.type_id(), TypeId::of::<WindowHandle>());
+        assert_eq!(monitors.type_id(), TypeId::of::<Vec<Monitor>>());
+        assert_eq!(
+            event.type_id(),
+            TypeId::of::<Option<(WindowHandle, Event)>>()
+        );
     }
 }

@@ -2,17 +2,42 @@
 
 import AppKit;
 
-@_cdecl("init")
-func initMacOS() {
+@_cdecl("setup")
+func setup() {
     let nsApp = NSApplication.shared
-    nsApp.run()
+    nsApp.setActivationPolicy(NSApplication.ActivationPolicy.regular)
+    nsApp.activate(ignoringOtherApps: true)
+    nsApp.finishLaunching()
 }
 
 @_cdecl("create_window")
-func createWindow(width: Int64, height: Int64, title: String) -> UInt8 {
+func createWindow(width: Int64, height: Int64, title: UnsafePointer<CChar>) -> UInt64 {
+    let title = String.init(cString: title)
     let size = NSRect.init(x: 0, y: 0, width: Int(width), height: Int(height))
     let window = MacOSWindow.init(size, title)
-    return UInt8(window.windowNumber)
+    return UInt64(window.windowNumber)
+}
+
+@_cdecl("next_event")
+func nextEvent() {
+    while true {
+        let event = NSApp.nextEvent(
+            matching: NSEvent.EventTypeMask.any,
+            until: nil,
+            inMode: RunLoop.Mode.default,
+            dequeue: true
+        )
+        if event == nil {
+            break
+        }
+        NSApp.sendEvent(event!)
+    }
+    for window in NSApp.windows {
+        print("Redrawing window \(window.windowNumber)")
+        window.contentView!.needsDisplay = true
+        window.orderFront(nil)
+        window.makeKeyAndOrderFront(nil)
+    }
 }
 
 public class MacOSWindow: NSWindow {
@@ -34,7 +59,7 @@ public class MacOSWindow: NSWindow {
         self.title = title
         self.center()
 
-        let view = MacOSView.init(size, UInt8(self.windowNumber))
+        let view = MacOSView.init(size, UInt64(self.windowNumber))
         self.contentView = view
         self.makeFirstResponder(view)
     }
@@ -42,9 +67,9 @@ public class MacOSWindow: NSWindow {
 
 public class MacOSView: NSView {
     // The window ID this view corresponds to in Rust
-    let id: uint8
+    let id: UInt64
 
-    init(_ frame: NSRect, _ id: uint8) {
+    init(_ frame: NSRect, _ id: UInt64) {
         self.id = id
         super.init(frame: frame)
     }
@@ -62,10 +87,10 @@ public class MacOSView: NSView {
     // The points macOS gives us for click events aren't in the View's
     // local coordinate system. They aren't scaled for DPI, and their Y
     // coordinate is inverted. This method adjusts points to correct that.
-    func translateMousePoint(_ point: NSPoint) -> (Float, Float) {
+    func translateMousePoint(_ point: NSPoint) -> (Float64, Float64) {
         let scaled_point = self.convertToBacking(point)
-        let y = Float(self.bounds.height) - Float(scaled_point.y) - 1.0
-        return (Float(scaled_point.x), y)
+        let y = Float64(self.bounds.height) - Float64(scaled_point.y) - 1.0
+        return (Float64(scaled_point.x), y)
     }
 
     // Mouse down events

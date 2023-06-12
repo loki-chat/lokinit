@@ -28,7 +28,7 @@ pub use linux::{
 };
 
 #[cfg(target_os = "macos")]
-pub use macos;
+pub use macos::{CreateWindowError, LokinitCore, NativeCoreError};
 
 #[cfg(target_os = "windows")]
 pub use windows;
