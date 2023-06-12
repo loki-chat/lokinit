@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use crate::event::{EventKind, Event};
+use crate::event::{Event, EventKind};
 use crate::native;
 use crate::native::linux::x11::X11NativeCore;
 use crate::window::{WindowBuilder, WindowHandle, WindowPos, WindowSize};
@@ -36,6 +36,8 @@ impl LokinitCore {
         unsafe { self.0.create_window(builder) }
     }
 
+    /// Poll an event. This function is blocking while waiting for the next event,
+    /// and returns `None` when the application requested to quit.
     pub fn poll_event(&mut self) -> Option<Event> {
         unsafe { self.0.poll_event() }
     }

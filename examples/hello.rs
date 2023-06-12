@@ -12,14 +12,9 @@ fn main() {
     )
     .unwrap();
 
-    let mut noevent_count: usize = 0;
-    loop {
-        if let Some(event) = core.poll_event() {
-            println!("New event: {:?}", event);
-            noevent_count = 0;
-        } else {
-            noevent_count += 1;
-            println!("no new event ({})", noevent_count);
-        }
+    while let Some(event) = core.poll_event() {
+        println!("New event: {:?}", event);
     }
+
+    println!("Quitting!");
 }

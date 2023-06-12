@@ -60,6 +60,7 @@ pub struct X11NativeCore {
     event_queue: VecDeque<Event>,
     is_composing: bool,
     str_buffer: Vec<u8>,
+    quit: bool,
 }
 
 impl X11NativeCore {
@@ -107,6 +108,7 @@ impl X11NativeCore {
             event_queue: VecDeque::new(),
             is_composing: false,
             str_buffer: vec![0; 16],
+            quit: false,
         })
     }
 
@@ -190,38 +192,44 @@ impl X11NativeCore {
     }
 
     pub unsafe fn poll_event(&mut self) -> Option<Event> {
-        // TODO: use this quit var somehow
-        let mut quit = false;
-
         if let Some(win_event) = self.event_queue.pop_front() {
             return Some(win_event);
         }
 
-        let count = (self.x11.XPending)(self.display.as_ptr());
+        // make sure we always poll a Lokinit event by skipping unknown ones
+        let mut win_event = None;
+        while win_event.is_none() {
+            let count = (self.x11.XPending)(self.display.as_ptr());
 
-        // get all pending events or wait for the next one
-        for _ in 0..count.max(1) {
-            let mut xevent = XEvent { type_id: 0 };
-            (self.x11.XNextEvent)(self.display.as_ptr(), &mut xevent);
+            // get all pending events or wait for the next one
+            for _ in 0..count.max(1) {
+                let mut xevent = XEvent { type_id: 0 };
+                (self.x11.XNextEvent)(self.display.as_ptr(), &mut xevent);
 
-            // Apparently, this forwards the event to the IME and returns whether the event was consumed.
-            // I know, weird. The name of the function is even weirder.
-            if (self.x11.XFilterEvent)(&mut xevent, XWindow::NONE) > 0 {
-                continue;
+                // Apparently, this forwards the event to the IME and returns whether the event was consumed.
+                // I know, weird. The name of the function is even weirder.
+                if (self.x11.XFilterEvent)(&mut xevent, XWindow::NONE) > 0 {
+                    continue;
+                }
+
+                self.process_event(&xevent);
             }
 
-            if let Some(handle) = self.process_event(&xevent) {
-                let window = self.get_window(handle);
-                quit |= xevent.xclient.data.l[0] as u64 == window.wm_delete_message;
+            (self.x11.XFlush)(self.display.as_ptr());
+
+            if self.quit {
+                // return early if asked to quit
+                return None;
             }
+
+            win_event = self.event_queue.pop_front();
         }
 
-        (self.x11.XFlush)(self.display.as_ptr());
-        self.event_queue.pop_front()
+        win_event
     }
 
     /// Transform an `XEvent` into one or more Lokinit `Event`s and push them into the event queue.
-    unsafe fn process_event(&mut self, xevent: &XEvent) -> Option<WindowHandle> {
+    unsafe fn process_event(&mut self, xevent: &XEvent) {
         match xevent.type_id {
             et::KEY_PRESS | et::KEY_RELEASE => {
                 let xevent = xevent.xkey;
@@ -276,7 +284,7 @@ impl X11NativeCore {
                 }
 
                 let Some(keycode) = keysym::to_keycode(keysym.0 as u32) else {
-                    return Some(handle);
+                    return;
                 };
 
                 let kind = if xevent.type_id == et::KEY_PRESS {
@@ -289,8 +297,6 @@ impl X11NativeCore {
                     window: handle,
                     kind,
                 });
-
-                Some(handle)
             }
             et::MOTION_NOTIFY => {
                 let xevent = xevent.xmotion;
@@ -305,10 +311,18 @@ impl X11NativeCore {
                     window: handle,
                     kind: EventKind::Mouse(MouseEvent::CursorMove(xevent.x, xevent.y)),
                 });
-
-                Some(handle)
             }
-            _ => None,
+            et::CLIENT_MESSAGE => {
+                let xevent = xevent.xclient;
+
+                let (&_handle, window) = (self.windows.iter())
+                    .find(|(_h, w)| w.window == xevent.window)
+                    .unwrap();
+
+                // if client requests to quit
+                self.quit |= xevent.data.l[0] as u64 == window.wm_delete_message;
+            }
+            _ => (),
         }
     }
 

@@ -31,9 +31,6 @@ pub enum EventKind {
 
     FocusIn,
     FocusOut,
-
-    /// May be temporary?
-    Unknown,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
