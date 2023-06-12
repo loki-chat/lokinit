@@ -2,28 +2,28 @@ use crate::core::MonitorId;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct WindowPos {
-    x: u32,
-    y: u32,
+    pub x: i32,
+    pub y: i32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct WindowSize {
-    width: u32,
-    height: u32,
+    pub width: u32,
+    pub height: u32,
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct WindowBuilder {
-    title: String,
-    position: WindowPos,
-    size: WindowSize,
-    monitor: Option<MonitorId>,
-    centered: bool,
-    resizable: bool,
-    maximized: bool,
-    fullscreen: bool,
-    transparent: bool,
-    high_dpi: bool,
+    pub(crate) title: String,
+    pub(crate) position: WindowPos,
+    pub(crate) size: WindowSize,
+    pub(crate) monitor: Option<MonitorId>,
+    pub(crate) centered: bool,
+    pub(crate) resizable: bool,
+    pub(crate) maximized: bool,
+    pub(crate) fullscreen: bool,
+    pub(crate) transparent: bool,
+    pub(crate) high_dpi: bool,
 }
 
 impl WindowBuilder {
@@ -36,7 +36,7 @@ impl WindowBuilder {
         self
     }
 
-    pub fn position(mut self, x: u32, y: u32) -> Self {
+    pub fn position(mut self, x: i32, y: i32) -> Self {
         self.position = WindowPos { x, y };
         self
     }
@@ -83,4 +83,4 @@ impl WindowBuilder {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct WindowHandle(usize);
+pub struct WindowHandle(pub(crate) usize);

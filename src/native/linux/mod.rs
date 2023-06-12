@@ -4,6 +4,7 @@ use std::ptr::NonNull;
 use self::dl::{dlopen, dlsym, get_dlerror, RTLD_NOW};
 
 mod dl;
+mod locale;
 pub mod wayland;
 pub mod x11;
 

@@ -22,11 +22,15 @@ pub enum Event {
 
     FocusIn,
     FocusOut,
+
+    /// May be temporary?
+    Unknown,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum KeyboardEvent {
-    Key(KeyCode),
+    KeyPress(KeyCode),
+    KeyRelease(KeyCode),
     Char(char),
     ImeCommit(String),
 }
