@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use crate::event::Event;
+use crate::event::{EventKind, Event};
 use crate::native;
 use crate::native::linux::x11::X11NativeCore;
 use crate::window::{WindowBuilder, WindowHandle, WindowPos, WindowSize};
@@ -36,7 +36,7 @@ impl LokinitCore {
         unsafe { self.0.create_window(builder) }
     }
 
-    pub fn poll_event(&mut self) -> Option<(WindowHandle, Event)> {
+    pub fn poll_event(&mut self) -> Option<Event> {
         unsafe { self.0.poll_event() }
     }
 

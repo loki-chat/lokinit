@@ -3,8 +3,9 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::ffi::{c_int, c_void, CString};
 use std::ptr::{null, null_mut, NonNull};
+use std::time::{Duration, Instant, SystemTime};
 
-use crate::event::{Event, KeyboardEvent};
+use crate::event::{Event, EventKind, KeyboardEvent, MouseEvent};
 use crate::library;
 use crate::native::linux::x11::ffi::{LibX11, XEvent};
 use crate::prelude::{WindowBuilder, WindowHandle, WindowPos, WindowSize};
@@ -56,7 +57,7 @@ pub struct X11NativeCore {
     display: NonNull<XDisplay>,
     windows: BTreeMap<WindowHandle, X11NativeWindow>,
     windex: usize,
-    event_queue: VecDeque<(WindowHandle, Event)>,
+    event_queue: VecDeque<Event>,
     is_composing: bool,
     str_buffer: Vec<u8>,
 }
@@ -123,7 +124,6 @@ impl X11NativeCore {
                 | xevent_mask::VISIBILITY_CHANGE
                 | xevent_mask::KEY_PRESS
                 | xevent_mask::KEY_RELEASE
-                | xevent_mask::KEYMAP_STATE
                 | xevent_mask::BUTTON_PRESS
                 | xevent_mask::BUTTON_RELEASE
                 | xevent_mask::POINTER_MOTION
@@ -170,7 +170,6 @@ impl X11NativeCore {
 
         // select IME and position it
         (self.x11.XSetICFocus)(xic.as_ptr());
-        (self.x11.XSelectInput)(self.display.as_ptr(), window, xevent_mask::KEY_PRESS);
         place_ime(&self.x11, xic, XPoint::new(0, 0));
 
         (self.x11.XFlush)(self.display.as_ptr());
@@ -190,7 +189,7 @@ impl X11NativeCore {
         Ok(handle)
     }
 
-    pub unsafe fn poll_event(&mut self) -> Option<(WindowHandle, Event)> {
+    pub unsafe fn poll_event(&mut self) -> Option<Event> {
         // TODO: use this quit var somehow
         let mut quit = false;
 
@@ -225,12 +224,15 @@ impl X11NativeCore {
     unsafe fn process_event(&mut self, xevent: &XEvent) -> Option<WindowHandle> {
         match xevent.type_id {
             et::KEY_PRESS | et::KEY_RELEASE => {
+                let xevent = xevent.xkey;
+                let time = Duration::from_millis(xevent.time);
+
                 let mut keysym = XID(0);
                 let mut status: Status = 0;
 
                 // TODO: having to traverse the tree to get the window is dumb, find another way to do it directly
                 let (&handle, window) = (self.windows.iter())
-                    .find(|(_h, w)| w.window == xevent.xkey.window)
+                    .find(|(_h, w)| w.window == xevent.window)
                     .unwrap();
 
                 if xevent.type_id == et::KEY_PRESS {
@@ -238,7 +240,7 @@ impl X11NativeCore {
 
                     let mut char_count = (self.x11.Xutf8LookupString)(
                         window.xic.as_ptr(),
-                        &xevent.xkey,
+                        &xevent,
                         self.str_buffer.as_mut_ptr() as *mut _,
                         self.str_buffer.len() as c_int,
                         &mut keysym,
@@ -251,7 +253,7 @@ impl X11NativeCore {
 
                         char_count = (self.x11.Xutf8LookupString)(
                             window.xic.as_ptr(),
-                            &xevent.xkey,
+                            &xevent,
                             self.str_buffer.as_mut_ptr() as *mut _,
                             self.str_buffer.len() as c_int,
                             &mut keysym,
@@ -265,8 +267,11 @@ impl X11NativeCore {
                         self.str_buffer[zeroidx] = 0;
 
                         let text = String::from_utf8_lossy(&self.str_buffer[..zeroidx]);
-                        let event = Event::Keyboard(KeyboardEvent::ImeCommit(text.into_owned()));
-                        self.event_queue.push_back((handle, event));
+                        self.event_queue.push_back(Event {
+                            time,
+                            window: handle,
+                            kind: EventKind::Keyboard(KeyboardEvent::ImeCommit(text.into_owned())),
+                        });
                     }
                 }
 
@@ -274,12 +279,32 @@ impl X11NativeCore {
                     return Some(handle);
                 };
 
-                let event = if xevent.type_id == et::KEY_PRESS {
-                    Event::Keyboard(KeyboardEvent::KeyPress(keycode))
+                let kind = if xevent.type_id == et::KEY_PRESS {
+                    EventKind::Keyboard(KeyboardEvent::KeyPress(keycode))
                 } else {
-                    Event::Keyboard(KeyboardEvent::KeyRelease(keycode))
+                    EventKind::Keyboard(KeyboardEvent::KeyRelease(keycode))
                 };
-                self.event_queue.push_back((handle, event));
+                self.event_queue.push_back(Event {
+                    time,
+                    window: handle,
+                    kind,
+                });
+
+                Some(handle)
+            }
+            et::MOTION_NOTIFY => {
+                let xevent = xevent.xmotion;
+                let time = Duration::from_millis(xevent.time);
+
+                let (&handle, _window) = (self.windows.iter())
+                    .find(|(_h, w)| w.window == xevent.window)
+                    .unwrap();
+
+                self.event_queue.push_back(Event {
+                    time,
+                    window: handle,
+                    kind: EventKind::Mouse(MouseEvent::CursorMove(xevent.x, xevent.y)),
+                });
 
                 Some(handle)
             }

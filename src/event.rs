@@ -1,9 +1,18 @@
 use std::path::PathBuf;
+use std::time::Duration;
 
 use crate::keycode::KeyCode;
+use crate::window::WindowHandle;
 
 #[derive(Clone, Debug)]
-pub enum Event {
+pub struct Event {
+    pub time: Duration,
+    pub window: WindowHandle,
+    pub kind: EventKind,
+}
+
+#[derive(Clone, Debug)]
+pub enum EventKind {
     Resized(u32, u32),
     Moved(i32, i32),
 
@@ -47,9 +56,9 @@ pub enum MouseButton {
 pub enum MouseEvent {
     ButtonPress(MouseButton),
     ButtonRelease(MouseButton),
-    CursorMove(f64, f64),
-    CursorIn(f64, f64),
-    CursorOut(f64, f64),
+    CursorMove(i32, i32),
+    CursorIn(i32, i32),
+    CursorOut(i32, i32),
     Wheel(f64, f64),
 }
 
