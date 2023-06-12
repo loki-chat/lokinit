@@ -2,7 +2,7 @@
 
 use crate::event::{Event, EventKind};
 use crate::native;
-use crate::window::{WindowBuilder, WindowHandle, WindowPos, WindowSize};
+use crate::window::{ScreenMode, WindowBuilder, WindowHandle, WindowPos, WindowSize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MonitorId(usize);
@@ -47,5 +47,13 @@ impl LokinitCore {
 
     pub fn window_size(&self, window: WindowHandle) -> WindowSize {
         self.0.window_size(window)
+    }
+
+    pub fn screen_mode(&self, window: WindowHandle) -> bool {
+        todo!()
+    }
+
+    pub fn set_screen_mode(&mut self, window: WindowHandle, screen_mode: ScreenMode) {
+        todo!()
     }
 }

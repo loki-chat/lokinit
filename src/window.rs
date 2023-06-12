@@ -12,16 +12,24 @@ pub struct WindowSize {
     pub height: u32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum ScreenMode {
+    #[default]
+    Windowed,
+    Borderless,
+    Fullscreen,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct WindowBuilder {
     pub(crate) title: String,
     pub(crate) position: WindowPos,
     pub(crate) size: WindowSize,
     pub(crate) monitor: Option<MonitorId>,
+    pub(crate) screen_mode: ScreenMode,
     pub(crate) centered: bool,
     pub(crate) resizable: bool,
     pub(crate) maximized: bool,
-    pub(crate) fullscreen: bool,
     pub(crate) transparent: bool,
     pub(crate) high_dpi: bool,
 }
@@ -51,6 +59,11 @@ impl WindowBuilder {
         self
     }
 
+    pub fn screen_mode(mut self, screen_mode: ScreenMode) -> Self {
+        self.screen_mode = screen_mode;
+        self
+    }
+
     pub fn centered(mut self, is_centered: bool) -> Self {
         self.centered = is_centered;
         self
@@ -63,11 +76,6 @@ impl WindowBuilder {
 
     pub fn maximized(mut self, is_maximized: bool) -> Self {
         self.maximized = is_maximized;
-        self
-    }
-
-    pub fn fullscreen(mut self, is_fullscreen: bool) -> Self {
-        self.fullscreen = is_fullscreen;
         self
     }
 
