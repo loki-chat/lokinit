@@ -23,9 +23,7 @@ fn main() {
                 count = 0;
             } else {
                 count += 1;
-                if count % 1000 == 0 {
-                    println!("no new event ({count})");
-                }
+                println!("no new event ({count})");
             }
         }
 }

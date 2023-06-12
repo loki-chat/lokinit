@@ -193,13 +193,15 @@ impl X11NativeCore {
     pub unsafe fn poll_event(&mut self) -> Option<(WindowHandle, Event)> {
         // TODO: use this quit var somehow
         let mut quit = false;
-        
+
         if let Some(win_event) = self.event_queue.pop_front() {
             return Some(win_event);
         }
 
         let count = (self.x11.XPending)(self.display.as_ptr());
-        for _ in 0..count {
+
+        // get all pending events or wait for the next one
+        for _ in 0..count.max(1) {
             let mut xevent = XEvent { type_id: 0 };
             (self.x11.XNextEvent)(self.display.as_ptr(), &mut xevent);
 
@@ -214,11 +216,12 @@ impl X11NativeCore {
                 quit |= xevent.xclient.data.l[0] as u64 == window.wm_delete_message;
             }
         }
+
         (self.x11.XFlush)(self.display.as_ptr());
-        
         self.event_queue.pop_front()
     }
 
+    /// Transform an `XEvent` into one or more Lokinit `Event`s and push them into the event queue.
     unsafe fn process_event(&mut self, xevent: &XEvent) -> Option<WindowHandle> {
         match xevent.type_id {
             et::KEY_PRESS | et::KEY_RELEASE => {
@@ -261,8 +264,8 @@ impl X11NativeCore {
                         let zeroidx = char_count as usize;
                         self.str_buffer[zeroidx] = 0;
 
-                        let text = String::from_utf8_lossy(&self.str_buffer[..zeroidx]).into_owned();
-                        let event = Event::Keyboard(KeyboardEvent::ImeCommit(text));
+                        let text = String::from_utf8_lossy(&self.str_buffer[..zeroidx]);
+                        let event = Event::Keyboard(KeyboardEvent::ImeCommit(text.into_owned()));
                         self.event_queue.push_back((handle, event));
                     }
                 }
@@ -280,10 +283,7 @@ impl X11NativeCore {
 
                 Some(handle)
             }
-            _ => {
-                self.event_queue.push_back((WindowHandle(0), Event::Unknown));
-                None
-            },
+            _ => None,
         }
     }
 
