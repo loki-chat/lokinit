@@ -2,7 +2,6 @@
 
 use crate::event::{Event, EventKind};
 use crate::native;
-use crate::native::linux::x11::X11NativeCore;
 use crate::window::{WindowBuilder, WindowHandle, WindowPos, WindowSize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -21,7 +20,7 @@ pub struct LokinitCore(#[cfg(target_os = "linux")] native::linux::x11::X11Native
 #[cfg(target_os = "linux")]
 impl LokinitCore {
     pub fn init() -> Result<Self, native::linux::x11::NativeCoreError> {
-        let native_core = unsafe { X11NativeCore::init() }?;
+        let native_core = unsafe { native::linux::x11::X11NativeCore::init() }?;
         Ok(Self(native_core))
     }
 

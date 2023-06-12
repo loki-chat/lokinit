@@ -50,7 +50,7 @@ pub struct X11NativeWindow {
     xic: NonNull<_XIC>,
 }
 
-pub struct X11NativeCore {
+pub(crate) struct X11NativeCore {
     x11: LibX11,
     root: XWindow,
     xim: NonNull<_XIM>,
