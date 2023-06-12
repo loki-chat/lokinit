@@ -1,15 +1,15 @@
 #include <CoreFoundation/CFAvailability.h>
 
 typedef CF_ENUM(int, MouseButton) {
-    Left,
-    Middle,
-    Right
+    Left = 0,
+    Middle = 1,
+    Right = 2
 };
 
 typedef CF_ENUM(int, MouseEvent) {
-    Down,
-    Up,
-    Moved
+    Pressed = 0,
+    Released = 1,
+    Moved = 2
 };
 
 void rust_mouse_callback(MouseButton btn, MouseEvent event, double x, double y);

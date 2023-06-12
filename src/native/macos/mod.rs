@@ -7,9 +7,9 @@ mod swift {
 
     #[repr(C)]
     pub enum SwiftMouseButton {
-        Left,
-        Middle,
-        Right,
+        Left = 0,
+        Middle = 1,
+        Right = 2,
     }
     impl From<SwiftMouseButton> for MouseButton {
         fn from(value: SwiftMouseButton) -> Self {
@@ -23,9 +23,9 @@ mod swift {
 
     #[repr(C)]
     pub enum SwiftMouseEvent {
-        Pressed,
-        Released,
-        Moved,
+        Pressed = 0,
+        Released = 1,
+        Moved = 2,
     }
     impl SwiftMouseEvent {
         pub fn into_mouse_event(self, x: f64, y: f64, button: SwiftMouseButton) -> MouseEvent {
@@ -44,14 +44,17 @@ mod swift {
     extern "C" {
         pub fn setup();
         pub fn create_window(width: i64, height: i64, title: *const c_char) -> u64;
-        pub fn next_event();
+        pub fn next_event() -> bool;
     }
 }
 
 /// FFI that's in Rust code
 pub mod rust {
     use {
-        super::swift::{SwiftMouseButton, SwiftMouseEvent},
+        super::{
+            swift::{SwiftMouseButton, SwiftMouseEvent},
+            EVENT_QUEUE,
+        },
         crate::{
             core,
             event::{Event, EventKind},
@@ -68,14 +71,14 @@ pub mod rust {
         x: f64,
         y: f64,
     ) {
-        core::with(move |instance| {
+        EVENT_QUEUE.with(move |queue| {
             let mouse_event = mouse_event.into_mouse_event(x, y, mouse_btn);
-            instance.event_queue.push_back(Event {
+            queue.borrow_mut().push_back(Event {
                 time: Duration::ZERO,
                 window: WindowHandle(window as usize),
                 kind: EventKind::Mouse(mouse_event),
             });
-        })
+        });
     }
 }
 
@@ -90,19 +93,21 @@ use {
         event::Event,
         window::{WindowBuilder, WindowHandle},
     },
-    std::{collections::VecDeque, ffi::CString},
+    std::{cell::RefCell, collections::VecDeque, ffi::CString},
 };
 
+thread_local! {
+    static EVENT_QUEUE: RefCell<VecDeque<Event>> = RefCell::new(VecDeque::new());
+}
+
 pub struct LokinitCore {
-    pub event_queue: VecDeque<Event>,
+    terminated: bool,
 }
 
 impl LokinitCore {
     pub fn init() -> Self {
         unsafe { swift::setup() };
-        Self {
-            event_queue: VecDeque::new(),
-        }
+        Self { terminated: true }
     }
 
     pub fn fetch_monitors() -> Vec<Monitor> {
@@ -125,8 +130,16 @@ impl LokinitCore {
         Ok(WindowHandle(window_id as usize))
     }
 
-    pub fn poll_event(&mut self) -> Option<Event> {
-        unsafe { swift::next_event() };
-        self.event_queue.pop_front()
+    pub fn poll_event(&self) -> Option<Event> {
+        let mut event = None;
+        while event.is_none() {
+            let terminated = unsafe { swift::next_event() };
+            if terminated {
+                println!("terminating");
+                return None;
+            }
+            event = EVENT_QUEUE.with(|queue| queue.borrow_mut().pop_front());
+        }
+        event
     }
 }

@@ -2,11 +2,15 @@
 
 import AppKit;
 
+let DELEGATE = MacOSApplicationDelegate()
+var TERMINATED = false
+
 @_cdecl("setup")
 func setup() {
     let nsApp = NSApplication.shared
     nsApp.setActivationPolicy(NSApplication.ActivationPolicy.regular)
     nsApp.activate(ignoringOtherApps: true)
+    nsApp.delegate = DELEGATE
     nsApp.finishLaunching()
 }
 
@@ -19,8 +23,13 @@ func createWindow(width: Int64, height: Int64, title: UnsafePointer<CChar>) -> U
 }
 
 @_cdecl("next_event")
-func nextEvent() {
+func nextEvent() -> Bool {
     while true {
+        // print("nextEvent starting")
+        if TERMINATED {
+            // print("nextEvent returning true")
+            return true
+        }
         let event = NSApp.nextEvent(
             matching: NSEvent.EventTypeMask.any,
             until: nil,
@@ -30,13 +39,22 @@ func nextEvent() {
         if event == nil {
             break
         }
+
         NSApp.sendEvent(event!)
+        // print("nextEvent done")
     }
     for window in NSApp.windows {
-        print("Redrawing window \(window.windowNumber)")
         window.contentView!.needsDisplay = true
-        window.orderFront(nil)
-        window.makeKeyAndOrderFront(nil)
+    }
+    // print("nextEvent returning false")
+    return false
+}
+
+public class MacOSApplicationDelegate: NSObject, NSApplicationDelegate {
+    public func applicationShouldTerminateAfterLastWindowClosed(_ app: NSApplication) -> Bool {
+        TERMINATED = true
+        print("terminating")
+        return true
     }
 }
 
@@ -62,6 +80,8 @@ public class MacOSWindow: NSWindow {
         let view = MacOSView.init(size, UInt64(self.windowNumber))
         self.contentView = view
         self.makeFirstResponder(view)
+
+        self.makeKeyAndOrderFront(nil)
     }
 }
 
@@ -96,29 +116,29 @@ public class MacOSView: NSView {
     // Mouse down events
     override public func mouseDown(with event: NSEvent) {
         let point = self.translateMousePoint(event.locationInWindow)
-        rust_mouse_callback(MouseButton.Left, MouseEvent.Down, point.0, point.1)
+        rust_mouse_callback(MouseButton.Left, MouseEvent.Pressed, point.0, point.1)
     }
     override public func rightMouseDown(with event: NSEvent) {
         let point = self.translateMousePoint(event.locationInWindow)
-        rust_mouse_callback(MouseButton.Right, MouseEvent.Down, point.0, point.1)
+        rust_mouse_callback(MouseButton.Right, MouseEvent.Pressed, point.0, point.1)
     }
     override public func otherMouseDown(with event: NSEvent) {
         let point = self.translateMousePoint(event.locationInWindow)
-        rust_mouse_callback(MouseButton.Middle, MouseEvent.Down, point.0, point.1)
+        rust_mouse_callback(MouseButton.Middle, MouseEvent.Pressed, point.0, point.1)
     }
 
     // Mouse up events
     override public func mouseUp(with event: NSEvent) {
         let point = self.translateMousePoint(event.locationInWindow)
-        rust_mouse_callback(MouseButton.Left, MouseEvent.Up, point.0, point.1)
+        rust_mouse_callback(MouseButton.Left, MouseEvent.Released, point.0, point.1)
     }
     override public func rightMouseUp(with event: NSEvent) {
         let point = self.translateMousePoint(event.locationInWindow)
-        rust_mouse_callback(MouseButton.Right, MouseEvent.Up, point.0, point.1)
+        rust_mouse_callback(MouseButton.Right, MouseEvent.Released, point.0, point.1)
     }
     override public func otherMouseUp(with event: NSEvent) {
         let point = self.translateMousePoint(event.locationInWindow)
-        rust_mouse_callback(MouseButton.Middle, MouseEvent.Up, point.0, point.1)
+        rust_mouse_callback(MouseButton.Middle, MouseEvent.Released, point.0, point.1)
     }
 
     // Mouse movement events
