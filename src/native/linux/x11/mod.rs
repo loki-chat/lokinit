@@ -5,7 +5,7 @@ use std::ffi::{c_int, c_void, CString};
 use std::ptr::{null, null_mut, NonNull};
 use std::time::{Duration, Instant, SystemTime};
 
-use crate::event::{Event, EventKind, KeyboardEvent, MouseEvent};
+use crate::event::{Event, EventKind, KeyboardEvent, MouseButton, MouseEvent};
 use crate::library;
 use crate::native::linux::x11::ffi::{LibX11, XEvent};
 use crate::prelude::{WindowBuilder, WindowHandle, WindowPos, WindowSize};
@@ -234,10 +234,10 @@ impl LokinitCore {
     }
 
     /// Transform an `XEvent` into one or more Lokinit `Event`s and push them into the event queue.
-    fn process_event(&mut self, xevent: &XEvent) {
-        match unsafe { xevent.type_id } {
+    unsafe fn process_event(&mut self, xevent: &XEvent) {
+        match xevent.type_id {
             et::KEY_PRESS | et::KEY_RELEASE => {
-                let xevent = unsafe { xevent.xkey };
+                let xevent = xevent.xkey;
                 let time = Duration::from_millis(xevent.time);
 
                 let mut keysym = XID(0);
@@ -251,35 +251,31 @@ impl LokinitCore {
                 if xevent.type_id == et::KEY_PRESS {
                     // Handle IME commit
 
-                    let mut char_count = unsafe {
-                        (self.x11.Xutf8LookupString)(
+                    let mut char_count = (self.x11.Xutf8LookupString)(
+                        window.xic.as_ptr(),
+                        &xevent,
+                        self.str_buffer.as_mut_ptr() as *mut _,
+                        self.str_buffer.len() as c_int,
+                        &mut keysym,
+                        &mut status,
+                    );
+
+                    // reallocating lookup string buffer if it wasn't big enough
+                    if status == X_BUFFER_OVERFLOW {
+                        self.str_buffer = vec![0; char_count as usize + 1];
+
+                        char_count = (self.x11.Xutf8LookupString)(
                             window.xic.as_ptr(),
                             &xevent,
                             self.str_buffer.as_mut_ptr() as *mut _,
                             self.str_buffer.len() as c_int,
                             &mut keysym,
                             &mut status,
-                        )
-                    };
-
-                    // reallocating lookup string buffer if it wasn't big enough
-                    if status == X_BUFFER_OVERFLOW {
-                        self.str_buffer = vec![0; char_count as usize + 1];
-
-                        char_count = unsafe {
-                            (self.x11.Xutf8LookupString)(
-                                window.xic.as_ptr(),
-                                &xevent,
-                                self.str_buffer.as_mut_ptr() as *mut _,
-                                self.str_buffer.len() as c_int,
-                                &mut keysym,
-                                &mut status,
-                            )
-                        };
+                        );
                     }
 
                     if char_count > 0 {
-                        unsafe { place_ime(&self.x11, window.xic, XPoint::new(0, 0)) };
+                        place_ime(&self.x11, window.xic, XPoint::new(0, 0));
                         let zeroidx = char_count as usize;
                         self.str_buffer[zeroidx] = 0;
 
@@ -301,14 +297,44 @@ impl LokinitCore {
                 } else {
                     EventKind::Keyboard(KeyboardEvent::KeyRelease(keycode))
                 };
+
                 self.event_queue.push_back(Event {
                     time,
                     window: handle,
                     kind,
                 });
             }
+
+            et::BUTTON_PRESS | et::BUTTON_RELEASE => {
+                let xevent = xevent.xbutton;
+                let time = Duration::from_millis(xevent.time);
+
+                let (&handle, window) = (self.windows.iter())
+                    .find(|(_h, w)| w.window == xevent.window)
+                    .unwrap();
+
+                let mouse_button = match xevent.button {
+                    1 => MouseButton::Left,
+                    2 => MouseButton::Middle,
+                    3 => MouseButton::Right,
+                    b => MouseButton::Other(b as u16),
+                };
+
+                let mouse_event = if xevent.type_id == et::BUTTON_PRESS {
+                    MouseEvent::ButtonPress(mouse_button, xevent.x, xevent.y)
+                } else {
+                    MouseEvent::ButtonRelease(mouse_button, xevent.x, xevent.y)
+                };
+
+                self.event_queue.push_back(Event {
+                    time,
+                    window: handle,
+                    kind: EventKind::Mouse(mouse_event),
+                })
+            }
+
             et::MOTION_NOTIFY => {
-                let xevent = unsafe { xevent.xmotion };
+                let xevent = xevent.xmotion;
                 let time = Duration::from_millis(xevent.time);
 
                 let (&handle, _window) = (self.windows.iter())
@@ -321,16 +347,18 @@ impl LokinitCore {
                     kind: EventKind::Mouse(MouseEvent::CursorMove(xevent.x, xevent.y)),
                 });
             }
+
             et::CLIENT_MESSAGE => {
-                let xevent = unsafe { xevent.xclient };
+                let xevent = xevent.xclient;
 
                 let (&_handle, window) = (self.windows.iter())
                     .find(|(_h, w)| w.window == xevent.window)
                     .unwrap();
 
                 // if client requests to quit
-                self.quit |= unsafe { xevent.data.l[0] } as u64 == window.wm_delete_message;
+                self.quit |= xevent.data.l[0] as u64 == window.wm_delete_message;
             }
+
             _ => (),
         }
     }
