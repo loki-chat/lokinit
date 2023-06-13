@@ -131,7 +131,9 @@ impl LokinitCore {
                     | xevent_mask::BUTTON_PRESS
                     | xevent_mask::BUTTON_RELEASE
                     | xevent_mask::POINTER_MOTION
-                    | xevent_mask::FOCUS_CHANGE,
+                    | xevent_mask::FOCUS_CHANGE
+                    | xevent_mask::ENTER_WINDOW
+                    | xevent_mask::LEAVE_WINDOW,
                 ..Default::default()
             };
 
@@ -320,17 +322,38 @@ impl LokinitCore {
                     b => MouseButton::Other(b as u16),
                 };
 
-                let mouse_event = if xevent.type_id == et::BUTTON_PRESS {
-                    MouseEvent::ButtonPress(mouse_button, xevent.x, xevent.y)
+                let kind = if xevent.type_id == et::BUTTON_PRESS {
+                    EventKind::Mouse(MouseEvent::ButtonPress(mouse_button, xevent.x, xevent.y))
                 } else {
-                    MouseEvent::ButtonRelease(mouse_button, xevent.x, xevent.y)
+                    EventKind::Mouse(MouseEvent::ButtonRelease(mouse_button, xevent.x, xevent.y))
                 };
 
                 self.event_queue.push_back(Event {
                     time,
                     window: handle,
-                    kind: EventKind::Mouse(mouse_event),
-                })
+                    kind,
+                });
+            }
+
+            et::ENTER_NOTIFY | et::LEAVE_NOTIFY => {
+                let xevent = xevent.xcrossing;
+                let time = Duration::from_millis(xevent.time);
+
+                let (&handle, window) = (self.windows.iter())
+                    .find(|(_h, w)| w.window == xevent.window)
+                    .unwrap();
+
+                let kind = if xevent.type_id == et::ENTER_NOTIFY {
+                    EventKind::Mouse(MouseEvent::CursorIn(xevent.x, xevent.y))
+                } else {
+                    EventKind::Mouse(MouseEvent::CursorOut(xevent.x, xevent.y))
+                };
+
+                self.event_queue.push_back(Event {
+                    time,
+                    window: handle,
+                    kind,
+                });
             }
 
             et::MOTION_NOTIFY => {
