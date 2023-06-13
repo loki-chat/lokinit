@@ -12,4 +12,4 @@ typedef CF_ENUM(int, MouseEvent) {
     Moved = 2
 };
 
-void rust_mouse_callback(MouseButton btn, MouseEvent event, double x, double y);
+void rust_mouse_callback(int window, MouseButton btn, MouseEvent event, double x, double y);

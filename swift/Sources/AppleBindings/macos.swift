@@ -116,35 +116,35 @@ public class MacOSView: NSView {
     // Mouse down events
     override public func mouseDown(with event: NSEvent) {
         let point = self.translateMousePoint(event.locationInWindow)
-        rust_mouse_callback(MouseButton.Left, MouseEvent.Pressed, point.0, point.1)
+        rust_mouse_callback(Int32(event.windowNumber), MouseButton.Left, MouseEvent.Pressed, point.0, point.1)
     }
     override public func rightMouseDown(with event: NSEvent) {
         let point = self.translateMousePoint(event.locationInWindow)
-        rust_mouse_callback(MouseButton.Right, MouseEvent.Pressed, point.0, point.1)
+        rust_mouse_callback(Int32(event.windowNumber), MouseButton.Right, MouseEvent.Pressed, point.0, point.1)
     }
     override public func otherMouseDown(with event: NSEvent) {
         let point = self.translateMousePoint(event.locationInWindow)
-        rust_mouse_callback(MouseButton.Middle, MouseEvent.Pressed, point.0, point.1)
+        rust_mouse_callback(Int32(event.windowNumber), MouseButton.Middle, MouseEvent.Pressed, point.0, point.1)
     }
 
     // Mouse up events
     override public func mouseUp(with event: NSEvent) {
         let point = self.translateMousePoint(event.locationInWindow)
-        rust_mouse_callback(MouseButton.Left, MouseEvent.Released, point.0, point.1)
+        rust_mouse_callback(Int32(event.windowNumber), MouseButton.Left, MouseEvent.Released, point.0, point.1)
     }
     override public func rightMouseUp(with event: NSEvent) {
         let point = self.translateMousePoint(event.locationInWindow)
-        rust_mouse_callback(MouseButton.Right, MouseEvent.Released, point.0, point.1)
+        rust_mouse_callback(Int32(event.windowNumber), MouseButton.Right, MouseEvent.Released, point.0, point.1)
     }
     override public func otherMouseUp(with event: NSEvent) {
         let point = self.translateMousePoint(event.locationInWindow)
-        rust_mouse_callback(MouseButton.Middle, MouseEvent.Released, point.0, point.1)
+        rust_mouse_callback(Int32(event.windowNumber), MouseButton.Middle, MouseEvent.Released, point.0, point.1)
     }
 
     // Mouse movement events
     override public func mouseMoved(with event: NSEvent) {
         let point = self.translateMousePoint(event.locationInWindow)
-        rust_mouse_callback(MouseButton.Left, MouseEvent.Moved, point.0, point.1)
+        rust_mouse_callback(Int32(event.windowNumber), MouseButton.Left, MouseEvent.Moved, point.0, point.1)
     }
 }
 

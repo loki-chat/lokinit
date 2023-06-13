@@ -5,7 +5,7 @@ mod swift {
         std::ffi::{c_char, c_void},
     };
 
-    #[repr(C)]
+    #[repr(i32)]
     pub enum SwiftMouseButton {
         Left = 0,
         Middle = 1,
@@ -21,7 +21,7 @@ mod swift {
         }
     }
 
-    #[repr(C)]
+    #[repr(i32)]
     pub enum SwiftMouseEvent {
         Pressed = 0,
         Released = 1,
@@ -50,6 +50,8 @@ mod swift {
 
 /// FFI that's in Rust code
 pub mod rust {
+    use crate::event::{MouseButton, MouseEvent};
+
     use {
         super::{
             swift::{SwiftMouseButton, SwiftMouseEvent},
@@ -65,7 +67,7 @@ pub mod rust {
 
     #[no_mangle]
     pub extern "C" fn rust_mouse_callback(
-        window: i64,
+        window: i32,
         mouse_btn: SwiftMouseButton,
         mouse_event: SwiftMouseEvent,
         x: f64,
@@ -73,6 +75,7 @@ pub mod rust {
     ) {
         EVENT_QUEUE.with(move |queue| {
             let mouse_event = mouse_event.into_mouse_event(x, y, mouse_btn);
+
             queue.borrow_mut().push_back(Event {
                 time: Duration::ZERO,
                 window: WindowHandle(window as usize),
