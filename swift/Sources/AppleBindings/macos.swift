@@ -2,44 +2,7 @@
 
 import AppKit;
 
-@_cdecl("setup")
-func setup() {
-    let nsApp = NSApplication.shared
-    nsApp.setActivationPolicy(NSApplication.ActivationPolicy.regular)
-    nsApp.activate(ignoringOtherApps: true)
-    nsApp.finishLaunching()
-}
-
-@_cdecl("create_window")
-func createWindow(width: Int64, height: Int64, title: UnsafePointer<CChar>) -> UInt64 {
-    let title = String.init(cString: title)
-    let size = NSRect.init(x: 0, y: 0, width: Int(width), height: Int(height))
-    let window = MacOSWindow.init(size, title)
-    return UInt64(window.windowNumber)
-}
-
-@_cdecl("next_event")
-func nextEvent() -> Bool {
-    if NSApp.windows.count == 0 {
-        return true
-    }
-    while true {
-        let event = NSApp.nextEvent(
-            matching: NSEvent.EventTypeMask.any,
-            until: nil,
-            inMode: RunLoop.Mode.default,
-            dequeue: true
-        )
-        if event == nil {
-            break
-        }
-
-        NSApp.sendEvent(event!)
-    }
-    return false
-}
-
-public class MacOSWindow: NSWindow {
+public class MacOSWindow: NSWindow, NSWindowDelegate {
     static let masks = 
         NSWindow.StyleMask.titled.rawValue | 
         NSWindow.StyleMask.closable.rawValue |
@@ -56,6 +19,7 @@ public class MacOSWindow: NSWindow {
 
         self.acceptsMouseMovedEvents = true
         self.title = title
+        self.delegate = self
         self.center()
 
         let view = MacOSView.init(size, UInt64(self.windowNumber))
@@ -64,10 +28,20 @@ public class MacOSWindow: NSWindow {
 
         self.makeKeyAndOrderFront(nil)
     }
+
+    // Window resize event
+    public func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
+        rust_window_resize_callback(
+            UInt(sender.windowNumber),
+            UInt32(frameSize.width),
+            UInt32(frameSize.height)
+        )
+
+        return frameSize
+    }
 }
 
 public class MacOSView: NSView {
-    // The window ID this view corresponds to in Rust
     let id: UInt64
 
     init(_ frame: NSRect, _ id: UInt64) {
