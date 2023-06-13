@@ -18,7 +18,7 @@ fn main() {
                 _ => {}
             }
         }
-        println!("Event: {event:?}");
+        println!("Received event: {event:?}");
     }
 
     println!("Quitting!");

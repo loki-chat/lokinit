@@ -2,15 +2,11 @@
 
 import AppKit;
 
-let DELEGATE = MacOSApplicationDelegate()
-var TERMINATED = false
-
 @_cdecl("setup")
 func setup() {
     let nsApp = NSApplication.shared
     nsApp.setActivationPolicy(NSApplication.ActivationPolicy.regular)
     nsApp.activate(ignoringOtherApps: true)
-    nsApp.delegate = DELEGATE
     nsApp.finishLaunching()
 }
 
@@ -24,12 +20,10 @@ func createWindow(width: Int64, height: Int64, title: UnsafePointer<CChar>) -> U
 
 @_cdecl("next_event")
 func nextEvent() -> Bool {
+    if NSApp.windows.count == 0 {
+        return true
+    }
     while true {
-        // print("nextEvent starting")
-        if TERMINATED {
-            // print("nextEvent returning true")
-            return true
-        }
         let event = NSApp.nextEvent(
             matching: NSEvent.EventTypeMask.any,
             until: nil,
@@ -41,21 +35,8 @@ func nextEvent() -> Bool {
         }
 
         NSApp.sendEvent(event!)
-        // print("nextEvent done")
     }
-    for window in NSApp.windows {
-        window.contentView!.needsDisplay = true
-    }
-    // print("nextEvent returning false")
     return false
-}
-
-public class MacOSApplicationDelegate: NSObject, NSApplicationDelegate {
-    public func applicationShouldTerminateAfterLastWindowClosed(_ app: NSApplication) -> Bool {
-        TERMINATED = true
-        print("terminating")
-        return true
-    }
 }
 
 public class MacOSWindow: NSWindow {

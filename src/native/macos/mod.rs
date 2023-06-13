@@ -136,9 +136,8 @@ impl LokinitCore {
     pub fn poll_event(&self) -> Option<Event> {
         let mut event = None;
         while event.is_none() {
-            let terminated = unsafe { swift::next_event() };
-            if terminated {
-                println!("terminating");
+            // next_event will return `True` if the app should terminate
+            if unsafe { swift::next_event() } {
                 return None;
             }
             event = EVENT_QUEUE.with(|queue| queue.borrow_mut().pop_front());
