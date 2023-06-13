@@ -50,7 +50,7 @@ pub struct X11NativeWindow {
     xic: NonNull<_XIC>,
 }
 
-pub(crate) struct X11NativeCore {
+pub struct LokinitCore {
     x11: LibX11,
     root: XWindow,
     xim: NonNull<_XIM>,
@@ -63,176 +63,181 @@ pub(crate) struct X11NativeCore {
     quit: bool,
 }
 
-impl X11NativeCore {
-    pub unsafe fn init() -> Result<Self, X11NativeCoreError> {
-        let x11 = LibX11::new()?;
+impl LokinitCore {
+    pub fn init() -> Result<Self, X11NativeCoreError> {
+        unsafe {
+            let x11 = LibX11::new()?;
 
-        (x11.XSetErrorHandler)(Some(x11_error_handler));
+            (x11.XSetErrorHandler)(Some(x11_error_handler));
 
-        // Prepare locale for IME to work properly
-        let empty_string = CString::new("").unwrap();
-        setlocale(LC_CTYPE, empty_string.as_ptr());
-        (x11.XSetLocaleModifiers)(empty_string.as_ptr());
+            // Prepare locale for IME to work properly
+            let empty_string = CString::new("").unwrap();
+            setlocale(LC_CTYPE, empty_string.as_ptr());
+            (x11.XSetLocaleModifiers)(empty_string.as_ptr());
 
-        (x11.XInitThreads)();
-        (x11.XrmInitialize)();
+            (x11.XInitThreads)();
+            (x11.XrmInitialize)();
 
-        // Open the default X11 display
-        let display = (x11.XOpenDisplay)(null());
-        let display = NonNull::new(display).ok_or(X11NativeCoreError::CannotOpenDisplay)?;
+            // Open the default X11 display
+            let display = (x11.XOpenDisplay)(null());
+            let display = NonNull::new(display).ok_or(X11NativeCoreError::CannotOpenDisplay)?;
 
-        let root = (x11.XDefaultRootWindow)(display.as_ptr());
+            let root = (x11.XDefaultRootWindow)(display.as_ptr());
 
-        // https://linux.die.net/man/3/xkbsetdetectableautorepeat
-        // TLDR: Xkb allows clients to request detectable auto-repeat.
-        // If a client requests and the server supports DetectableAutoRepeat,
-        // Xkb generates KeyRelease events only when the key is physically
-        // released. If DetectableAutoRepeat is not supported or has not been
-        // requested, the server synthesizes a KeyRelease event for each
-        // repeating KeyPress event it generates.
-        (x11.XkbSetDetectableAutoRepeat)(display.as_ptr(), true as _, null_mut());
+            // https://linux.die.net/man/3/xkbsetdetectableautorepeat
+            // TLDR: Xkb allows clients to request detectable auto-repeat.
+            // If a client requests and the server supports DetectableAutoRepeat,
+            // Xkb generates KeyRelease events only when the key is physically
+            // released. If DetectableAutoRepeat is not supported or has not been
+            // requested, the server synthesizes a KeyRelease event for each
+            // repeating KeyPress event it generates.
+            (x11.XkbSetDetectableAutoRepeat)(display.as_ptr(), true as _, null_mut());
 
-        // Initialize IME
-        let xim = (x11.XOpenIM)(display.as_ptr(), null_mut(), null(), null());
-        let xim = NonNull::new(xim).ok_or(X11NativeCoreError::CannotOpenInputMethod)?;
+            // Initialize IME
+            let xim = (x11.XOpenIM)(display.as_ptr(), null_mut(), null(), null());
+            let xim = NonNull::new(xim).ok_or(X11NativeCoreError::CannotOpenInputMethod)?;
 
-        (x11.XFlush)(display.as_ptr());
+            (x11.XFlush)(display.as_ptr());
 
-        Ok(Self {
-            x11,
-            root,
-            xim,
-            display,
-            windows: BTreeMap::new(),
-            windex: 0,
-            event_queue: VecDeque::new(),
-            is_composing: false,
-            str_buffer: vec![0; 16],
-            quit: false,
-        })
+            Ok(Self {
+                x11,
+                root,
+                xim,
+                display,
+                windows: BTreeMap::new(),
+                windex: 0,
+                event_queue: VecDeque::new(),
+                is_composing: false,
+                str_buffer: vec![0; 16],
+                quit: false,
+            })
+        }
     }
 
-    pub unsafe fn create_window(
+    pub fn create_window(
         &mut self,
         builder: WindowBuilder,
     ) -> Result<WindowHandle, X11CreateWindowError> {
         self.windex += 1;
-
         let handle = WindowHandle(self.windex);
 
-        let mut attributes = XSetWindowAttributes {
-            event_mask: xevent_mask::EXPOSURE
-                | xevent_mask::STRUCTURE_NOTIFY
-                | xevent_mask::VISIBILITY_CHANGE
-                | xevent_mask::KEY_PRESS
-                | xevent_mask::KEY_RELEASE
-                | xevent_mask::BUTTON_PRESS
-                | xevent_mask::BUTTON_RELEASE
-                | xevent_mask::POINTER_MOTION
-                | xevent_mask::FOCUS_CHANGE,
-            ..Default::default()
-        };
+        unsafe {
+            let mut attributes = XSetWindowAttributes {
+                event_mask: xevent_mask::EXPOSURE
+                    | xevent_mask::STRUCTURE_NOTIFY
+                    | xevent_mask::VISIBILITY_CHANGE
+                    | xevent_mask::KEY_PRESS
+                    | xevent_mask::KEY_RELEASE
+                    | xevent_mask::BUTTON_PRESS
+                    | xevent_mask::BUTTON_RELEASE
+                    | xevent_mask::POINTER_MOTION
+                    | xevent_mask::FOCUS_CHANGE,
+                ..Default::default()
+            };
 
-        let window_attributes = xcw::EVENT_MASK;
+            let window_attributes = xcw::EVENT_MASK;
 
-        let window = (self.x11.XCreateWindow)(
-            self.display.as_ptr(),
-            self.root,
-            builder.position.x,
-            builder.position.y,
-            builder.size.width,
-            builder.size.height,
-            0,
-            0,
-            xclass::INPUT_OUTPUT,
-            null_mut(),
-            window_attributes,
-            &mut attributes,
-        );
+            let window = (self.x11.XCreateWindow)(
+                self.display.as_ptr(),
+                self.root,
+                builder.position.x,
+                builder.position.y,
+                builder.size.width,
+                builder.size.height,
+                0,
+                0,
+                xclass::INPUT_OUTPUT,
+                null_mut(),
+                window_attributes,
+                &mut attributes,
+            );
 
-        // register interest in the delete window message
-        let atom_name = CString::new("WM_DELETE_WINDOW").unwrap();
-        let wm_delete_message =
-            (self.x11.XInternAtom)(self.display.as_ptr(), atom_name.as_ptr(), 0);
-        (self.x11.XSetWMProtocols)(self.display.as_ptr(), window, &wm_delete_message, 1);
+            // register interest in the delete window message
+            let atom_name = CString::new("WM_DELETE_WINDOW").unwrap();
+            let wm_delete_message =
+                (self.x11.XInternAtom)(self.display.as_ptr(), atom_name.as_ptr(), 0);
+            (self.x11.XSetWMProtocols)(self.display.as_ptr(), window, &wm_delete_message, 1);
 
-        // spawn window on the screen
-        (self.x11.XMapWindow)(self.display.as_ptr(), window);
+            // spawn window on the screen
+            (self.x11.XMapWindow)(self.display.as_ptr(), window);
 
-        // create IME context for this window
-        let xic = (self.x11.XCreateIC)(
-            self.xim.as_ptr(),
-            xn::INPUT_STYLE,
-            xim::PREEDIT_NOTHING | xim::STATUS_NOTHING,
-            xn::CLIENT_WINDOW,
-            window,
-            null_mut::<c_void>(),
-        );
-        let xic = NonNull::new(xic).ok_or(X11CreateWindowError::CannotOpenInputContext)?;
-
-        // select IME and position it
-        (self.x11.XSetICFocus)(xic.as_ptr());
-        place_ime(&self.x11, xic, XPoint::new(0, 0));
-
-        (self.x11.XFlush)(self.display.as_ptr());
-
-        // save window in core
-        self.windows.insert(
-            handle,
-            X11NativeWindow {
+            // create IME context for this window
+            let xic = (self.x11.XCreateIC)(
+                self.xim.as_ptr(),
+                xn::INPUT_STYLE,
+                xim::PREEDIT_NOTHING | xim::STATUS_NOTHING,
+                xn::CLIENT_WINDOW,
                 window,
-                position: builder.position,
-                size: builder.size,
-                wm_delete_message,
-                xic,
-            },
-        );
+                null_mut::<c_void>(),
+            );
+            let xic = NonNull::new(xic).ok_or(X11CreateWindowError::CannotOpenInputContext)?;
 
-        Ok(handle)
+            // select IME and position it
+            (self.x11.XSetICFocus)(xic.as_ptr());
+            place_ime(&self.x11, xic, XPoint::new(0, 0));
+
+            (self.x11.XFlush)(self.display.as_ptr());
+
+            // save window in core
+            self.windows.insert(
+                handle,
+                X11NativeWindow {
+                    window,
+                    position: builder.position,
+                    size: builder.size,
+                    wm_delete_message,
+                    xic,
+                },
+            );
+
+            Ok(handle)
+        }
     }
 
-    pub unsafe fn poll_event(&mut self) -> Option<Event> {
+    pub fn poll_event(&mut self) -> Option<Event> {
         if let Some(win_event) = self.event_queue.pop_front() {
             return Some(win_event);
         }
 
-        // make sure we always poll a Lokinit event by skipping unknown ones
-        let mut win_event = None;
-        while win_event.is_none() {
-            let count = (self.x11.XPending)(self.display.as_ptr());
+        unsafe {
+            // make sure we always poll a Lokinit event by skipping unknown ones
+            let mut win_event = None;
+            while win_event.is_none() {
+                let count = (self.x11.XPending)(self.display.as_ptr());
 
-            // get all pending events or wait for the next one
-            for _ in 0..count.max(1) {
-                let mut xevent = XEvent { type_id: 0 };
-                (self.x11.XNextEvent)(self.display.as_ptr(), &mut xevent);
+                // get all pending events or wait for the next one
+                for _ in 0..count.max(1) {
+                    let mut xevent = XEvent { type_id: 0 };
+                    (self.x11.XNextEvent)(self.display.as_ptr(), &mut xevent);
 
-                // Apparently, this forwards the event to the IME and returns whether the event was consumed.
-                // I know, weird. The name of the function is even weirder.
-                if (self.x11.XFilterEvent)(&mut xevent, XWindow::NONE) > 0 {
-                    continue;
+                    // Apparently, this forwards the event to the IME and returns whether the event was consumed.
+                    // I know, weird. The name of the function is even weirder.
+                    if (self.x11.XFilterEvent)(&mut xevent, XWindow::NONE) > 0 {
+                        continue;
+                    }
+
+                    self.process_event(&xevent);
                 }
 
-                self.process_event(&xevent);
+                (self.x11.XFlush)(self.display.as_ptr());
+
+                if self.quit {
+                    // return early if asked to quit
+                    return None;
+                }
+
+                win_event = self.event_queue.pop_front();
             }
 
-            (self.x11.XFlush)(self.display.as_ptr());
-
-            if self.quit {
-                // return early if asked to quit
-                return None;
-            }
-
-            win_event = self.event_queue.pop_front();
+            win_event
         }
-
-        win_event
     }
 
     /// Transform an `XEvent` into one or more Lokinit `Event`s and push them into the event queue.
-    unsafe fn process_event(&mut self, xevent: &XEvent) {
-        match xevent.type_id {
+    fn process_event(&mut self, xevent: &XEvent) {
+        match unsafe { xevent.type_id } {
             et::KEY_PRESS | et::KEY_RELEASE => {
-                let xevent = xevent.xkey;
+                let xevent = unsafe { xevent.xkey };
                 let time = Duration::from_millis(xevent.time);
 
                 let mut keysym = XID(0);
@@ -246,31 +251,35 @@ impl X11NativeCore {
                 if xevent.type_id == et::KEY_PRESS {
                     // Handle IME commit
 
-                    let mut char_count = (self.x11.Xutf8LookupString)(
-                        window.xic.as_ptr(),
-                        &xevent,
-                        self.str_buffer.as_mut_ptr() as *mut _,
-                        self.str_buffer.len() as c_int,
-                        &mut keysym,
-                        &mut status,
-                    );
-
-                    // reallocating lookup string buffer if it wasn't big enough
-                    if status == X_BUFFER_OVERFLOW {
-                        self.str_buffer = vec![0; char_count as usize + 1];
-
-                        char_count = (self.x11.Xutf8LookupString)(
+                    let mut char_count = unsafe {
+                        (self.x11.Xutf8LookupString)(
                             window.xic.as_ptr(),
                             &xevent,
                             self.str_buffer.as_mut_ptr() as *mut _,
                             self.str_buffer.len() as c_int,
                             &mut keysym,
                             &mut status,
-                        );
+                        )
+                    };
+
+                    // reallocating lookup string buffer if it wasn't big enough
+                    if status == X_BUFFER_OVERFLOW {
+                        self.str_buffer = vec![0; char_count as usize + 1];
+
+                        char_count = unsafe {
+                            (self.x11.Xutf8LookupString)(
+                                window.xic.as_ptr(),
+                                &xevent,
+                                self.str_buffer.as_mut_ptr() as *mut _,
+                                self.str_buffer.len() as c_int,
+                                &mut keysym,
+                                &mut status,
+                            )
+                        };
                     }
 
                     if char_count > 0 {
-                        place_ime(&self.x11, window.xic, XPoint::new(0, 0));
+                        unsafe { place_ime(&self.x11, window.xic, XPoint::new(0, 0)) };
                         let zeroidx = char_count as usize;
                         self.str_buffer[zeroidx] = 0;
 
@@ -299,7 +308,7 @@ impl X11NativeCore {
                 });
             }
             et::MOTION_NOTIFY => {
-                let xevent = xevent.xmotion;
+                let xevent = unsafe { xevent.xmotion };
                 let time = Duration::from_millis(xevent.time);
 
                 let (&handle, _window) = (self.windows.iter())
@@ -313,14 +322,14 @@ impl X11NativeCore {
                 });
             }
             et::CLIENT_MESSAGE => {
-                let xevent = xevent.xclient;
+                let xevent = unsafe { xevent.xclient };
 
                 let (&_handle, window) = (self.windows.iter())
                     .find(|(_h, w)| w.window == xevent.window)
                     .unwrap();
 
                 // if client requests to quit
-                self.quit |= xevent.data.l[0] as u64 == window.wm_delete_message;
+                self.quit |= unsafe { xevent.data.l[0] } as u64 == window.wm_delete_message;
             }
             _ => (),
         }

@@ -3,7 +3,7 @@
 use {
     crate::{
         event::Event,
-        native::{CreateWindowError, NativeCoreError},
+        native::{CreateWindowError, LokinitCore, NativeCoreError},
         window::{WindowBuilder, WindowHandle, WindowPos, WindowSize},
     },
     std::{cell::RefCell, rc::Rc},
@@ -20,21 +20,15 @@ pub struct Monitor {
     hertz: u32,
 }
 
-pub use crate::native::LokinitCore;
 thread_local! {
-    // pub static INSTANCE: Rc<RefCell<Option<LokinitCore>>> = Rc::new(RefCell::new(None));
     pub static INSTANCE: RefCell<Option<LokinitCore>> = RefCell::new(None);
 }
 
 pub fn with<R>(callback: impl FnOnce(&mut LokinitCore) -> R) -> R {
     INSTANCE.with(|instance| {
         let mut instance = instance.borrow_mut();
-
-        if instance.is_none() {
-            *instance = Some(LokinitCore::init());
-        }
-
-        callback(instance.as_mut().unwrap())
+        let instance = instance.get_or_insert_with(|| LokinitCore::init().unwrap());
+        (callback)(instance)
     })
 }
 
@@ -46,25 +40,8 @@ pub fn poll_event() -> Option<Event> {
     with(|instance| instance.poll_event())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::any::{Any, TypeId};
+// TODO: implement monitor fetching
 
-    /// Make sure the native core impl supports all methods, and that they return the correct type
-    #[test]
-    fn core_has_all_methods() {
-        let mut core = LokinitCore::init();
-        let window = core.create_window(WindowBuilder::default());
-        let monitors = LokinitCore::fetch_monitors();
-        let event = core.poll_event();
-
-        assert_eq!(core.type_id(), TypeId::of::<LokinitCore>());
-        assert_eq!(window.type_id(), TypeId::of::<WindowHandle>());
-        assert_eq!(monitors.type_id(), TypeId::of::<Vec<Monitor>>());
-        assert_eq!(
-            event.type_id(),
-            TypeId::of::<Option<(WindowHandle, Event)>>()
-        );
-    }
-}
+// pub fn fetch_monitors() -> Vec<Monitor> {
+//     with(|instance| instance.fetch_monitors())
+// }

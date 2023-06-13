@@ -23,7 +23,7 @@ pub use ios;
 
 #[cfg(target_os = "linux")]
 pub use linux::{
-    x11::{CreateWindowError, NativeCoreError},
+    x11::{CreateWindowError, LokinitCore, NativeCoreError},
     LoadingError,
 };
 

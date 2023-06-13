@@ -62,7 +62,7 @@ macro_rules! library {
         }
 
         impl $lib {
-            pub fn new() -> Result<Self, $crate::native::linux::LoadingError> {
+            pub unsafe fn new() -> Result<Self, $crate::native::linux::LoadingError> {
                 let lib = $crate::native::linux::Library::new($name)
                     .map_err($crate::native::linux::LoadingError::Library)?;
 

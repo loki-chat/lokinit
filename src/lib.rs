@@ -6,7 +6,7 @@ pub mod window;
 
 pub mod prelude {
     pub use crate::core;
-    pub use crate::core::{LokinitCore, Monitor, MonitorId};
+    pub use crate::core::{Monitor, MonitorId};
     pub use crate::event::{
         Event, EventKind, KeyboardEvent, MouseButton, MouseEvent, TouchEvent, TouchPhase,
     };
