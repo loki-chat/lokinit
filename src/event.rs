@@ -37,6 +37,7 @@ pub enum EventKind {
 pub enum KeyboardEvent {
     KeyPress(KeyCode),
     KeyRelease(KeyCode),
+    KeyRepeat(KeyCode),
     Char(char),
     ImeCommit(String),
 }

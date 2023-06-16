@@ -1,18 +1,20 @@
 #![allow(unused)]
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, VecDeque};
 use std::ffi::{c_int, c_void, CString};
 use std::ptr::{null, null_mut, NonNull};
 use std::time::{Duration, Instant, SystemTime};
 
 use crate::event::{Event, EventKind, KeyboardEvent, MouseButton, MouseEvent};
+use crate::keycode::KeyCode;
 use crate::library;
 use crate::native::linux::x11::ffi::{LibX11, XEvent};
 use crate::prelude::{WindowBuilder, WindowHandle, WindowPos, WindowSize};
 
 use self::ffi::{
     et, xclass, xcw, xevent_mask, xim, xn, Status, XDisplay, XErrorEvent, XPoint,
-    XSetWindowAttributes, XWindow, XID, X_BUFFER_OVERFLOW, _XIC, _XIM,
+    XSetWindowAttributes, XWindow, XID, X_BUFFER_OVERFLOW, _XIC, _XIM, XKeyEvent,
 };
 
 use super::locale::{setlocale, LC_CTYPE};
@@ -56,8 +58,8 @@ pub struct LokinitCore {
     xim: NonNull<_XIM>,
     display: NonNull<XDisplay>,
     windows: BTreeMap<WindowHandle, X11NativeWindow>,
-    windex: usize,
     event_queue: VecDeque<Event>,
+    prev_key: Option<KeyCode>,
     is_composing: bool,
     str_buffer: Vec<u8>,
     quit: bool,
@@ -105,8 +107,8 @@ impl LokinitCore {
                 xim,
                 display,
                 windows: BTreeMap::new(),
-                windex: 0,
                 event_queue: VecDeque::new(),
+                prev_key: None,
                 is_composing: false,
                 str_buffer: vec![0; 16],
                 quit: false,
@@ -118,8 +120,6 @@ impl LokinitCore {
         &mut self,
         builder: WindowBuilder,
     ) -> Result<WindowHandle, X11CreateWindowError> {
-        self.windex += 1;
-        let handle = WindowHandle(self.windex);
 
         unsafe {
             let mut attributes = XSetWindowAttributes {
@@ -179,6 +179,8 @@ impl LokinitCore {
             place_ime(&self.x11, xic, XPoint::new(0, 0));
 
             (self.x11.XFlush)(self.display.as_ptr());
+
+            let handle = window.into_window_handle();
 
             // save window in core
             self.windows.insert(
@@ -242,78 +244,61 @@ impl LokinitCore {
                 let xevent = xevent.xkey;
                 let time = Duration::from_millis(xevent.time);
 
-                let mut keysym = XID(0);
-                let mut status: Status = 0;
+                let handle = xevent.window.into_window_handle();
+                let window = self.windows.get(&handle).unwrap();
 
-                // TODO: having to traverse the tree to get the window is dumb, find another way to do it directly
-                let (&handle, window) = (self.windows.iter())
-                    .find(|(_h, w)| w.window == xevent.window)
-                    .unwrap();
+                let (keysym, text) = utf8_lookup_string(&self.x11, &mut self.str_buffer, window, xevent);
 
-                if xevent.type_id == et::KEY_PRESS {
-                    // Handle IME commit
+                if let Some(keycode) = keysym::to_keycode(keysym.0 as u32) {
+                    let kb_event = match (xevent.type_id, self.prev_key) {
+                        (et::KEY_PRESS, Some(k)) if k == keycode => {
+                            KeyboardEvent::KeyRepeat(keycode)
+                        }
+                        (et::KEY_PRESS, _) => {
+                            self.prev_key = Some(keycode);
+                            KeyboardEvent::KeyPress(keycode)
+                        }
+                        (et::KEY_RELEASE, Some(k)) if k == keycode => {
+                            self.prev_key = None;
+                            KeyboardEvent::KeyRelease(keycode)
+                        }
+                        (et::KEY_RELEASE, _) => {
+                            KeyboardEvent::KeyRelease(keycode)
+                        }
+                        _ => unreachable!(),
+                    };
 
-                    let mut char_count = (self.x11.Xutf8LookupString)(
-                        window.xic.as_ptr(),
-                        &xevent,
-                        self.str_buffer.as_mut_ptr() as *mut _,
-                        self.str_buffer.len() as c_int,
-                        &mut keysym,
-                        &mut status,
-                    );
+                    // Send IME commit only on a non-repeated key press
+                    let do_ime = matches!(kb_event, KeyboardEvent::KeyPress(_));
+    
+                    self.event_queue.push_back(Event {
+                        time,
+                        window: handle,
+                        kind: EventKind::Keyboard(kb_event)
+                    });
 
-                    // reallocating lookup string buffer if it wasn't big enough
-                    if status == X_BUFFER_OVERFLOW {
-                        self.str_buffer = vec![0; char_count as usize + 1];
-
-                        char_count = (self.x11.Xutf8LookupString)(
-                            window.xic.as_ptr(),
-                            &xevent,
-                            self.str_buffer.as_mut_ptr() as *mut _,
-                            self.str_buffer.len() as c_int,
-                            &mut keysym,
-                            &mut status,
-                        );
+                    if !do_ime {
+                        return;
                     }
+                };
 
-                    if char_count > 0 {
-                        place_ime(&self.x11, window.xic, XPoint::new(0, 0));
-                        let zeroidx = char_count as usize;
-                        self.str_buffer[zeroidx] = 0;
-
-                        let text = String::from_utf8_lossy(&self.str_buffer[..zeroidx]);
-                        self.event_queue.push_back(Event {
-                            time,
-                            window: handle,
-                            kind: EventKind::Keyboard(KeyboardEvent::ImeCommit(text.into_owned())),
-                        });
-                    }
+                // Handle IME commit
+                if let Some(text) = text {
+                    place_ime(&self.x11, window.xic, XPoint::new(0, 0));
+                    self.event_queue.push_back(Event {
+                        time,
+                        window: handle,
+                        kind: EventKind::Keyboard(KeyboardEvent::ImeCommit(text.into_owned())),
+                    });
                 }
-
-                let Some(keycode) = keysym::to_keycode(keysym.0 as u32) else {
-                    return;
-                };
-
-                let kind = if xevent.type_id == et::KEY_PRESS {
-                    EventKind::Keyboard(KeyboardEvent::KeyPress(keycode))
-                } else {
-                    EventKind::Keyboard(KeyboardEvent::KeyRelease(keycode))
-                };
-
-                self.event_queue.push_back(Event {
-                    time,
-                    window: handle,
-                    kind,
-                });
             }
 
             et::BUTTON_PRESS | et::BUTTON_RELEASE => {
                 let xevent = xevent.xbutton;
                 let time = Duration::from_millis(xevent.time);
 
-                let (&handle, window) = (self.windows.iter())
-                    .find(|(_h, w)| w.window == xevent.window)
-                    .unwrap();
+                let handle = xevent.window.into_window_handle();
+                let window = self.windows.get(&handle).unwrap();
 
                 let mouse_button = match xevent.button {
                     1 => MouseButton::Left,
@@ -335,24 +320,17 @@ impl LokinitCore {
                 });
             }
 
-            et::ENTER_NOTIFY | et::LEAVE_NOTIFY => {
-                let xevent = xevent.xcrossing;
-                let time = Duration::from_millis(xevent.time);
+            et::DESTROY_NOTIFY => {
+                let xevent = xevent.xdestroywindow;
+                let time = Duration::from_millis(0);
 
-                let (&handle, window) = (self.windows.iter())
-                    .find(|(_h, w)| w.window == xevent.window)
-                    .unwrap();
-
-                let kind = if xevent.type_id == et::ENTER_NOTIFY {
-                    EventKind::Mouse(MouseEvent::CursorIn(xevent.x, xevent.y))
-                } else {
-                    EventKind::Mouse(MouseEvent::CursorOut(xevent.x, xevent.y))
-                };
+                let handle = xevent.window.into_window_handle();
+                let window = self.windows.get(&handle).unwrap();
 
                 self.event_queue.push_back(Event {
                     time,
                     window: handle,
-                    kind,
+                    kind: EventKind::Destroyed,
                 });
             }
 
@@ -371,12 +349,31 @@ impl LokinitCore {
                 });
             }
 
+            et::ENTER_NOTIFY | et::LEAVE_NOTIFY => {
+                let xevent = xevent.xcrossing;
+                let time = Duration::from_millis(xevent.time);
+
+                let handle = xevent.window.into_window_handle();
+                let window = self.windows.get(&handle).unwrap();
+
+                let kind = if xevent.type_id == et::ENTER_NOTIFY {
+                    EventKind::Mouse(MouseEvent::CursorIn(xevent.x, xevent.y))
+                } else {
+                    EventKind::Mouse(MouseEvent::CursorOut(xevent.x, xevent.y))
+                };
+
+                self.event_queue.push_back(Event {
+                    time,
+                    window: handle,
+                    kind,
+                });
+            }
+
             et::CLIENT_MESSAGE => {
                 let xevent = xevent.xclient;
 
-                let (&_handle, window) = (self.windows.iter())
-                    .find(|(_h, w)| w.window == xevent.window)
-                    .unwrap();
+                let handle = xevent.window.into_window_handle();
+                let window = self.windows.get(&handle).unwrap();
 
                 // if client requests to quit
                 self.quit |= xevent.data.l[0] as u64 == window.wm_delete_message;
@@ -421,4 +418,43 @@ unsafe fn place_ime(x11: &LibX11, xic: NonNull<_XIC>, place: XPoint) {
     );
 
     (x11.XFree)(preedit_attr as *mut c_void);
+}
+
+unsafe fn utf8_lookup_string<'a>(x11: &LibX11, str_buffer: &'a mut Vec<u8>, window: &X11NativeWindow, mut xpress: XKeyEvent) -> (XID, Option<Cow<'a, str>>) {
+    let mut keysym = XID(0);
+    let mut status: Status = 0;
+
+    xpress.type_id = et::KEY_PRESS;
+
+    let mut char_count = (x11.Xutf8LookupString)(
+        window.xic.as_ptr(),
+        &xpress,
+        str_buffer.as_mut_ptr() as *mut _,
+        str_buffer.len() as c_int,
+        &mut keysym,
+        &mut status,
+    );
+
+    // reallocating lookup string buffer if it wasn't big enough
+    if status == X_BUFFER_OVERFLOW {
+        *str_buffer = vec![0; char_count as usize + 1];
+
+        char_count = (x11.Xutf8LookupString)(
+            window.xic.as_ptr(),
+            &xpress,
+            str_buffer.as_mut_ptr() as *mut _,
+            str_buffer.len() as c_int,
+            &mut keysym,
+            &mut status,
+        );
+    }
+
+    let text = (char_count > 0).then(|| {
+        let zeroidx = char_count as usize;
+        str_buffer[zeroidx] = 0;
+
+        String::from_utf8_lossy(&str_buffer[..zeroidx])
+    });
+
+    (keysym, text)
 }

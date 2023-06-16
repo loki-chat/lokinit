@@ -7,6 +7,7 @@ pub mod xevents;
 pub use xevents::*;
 
 use crate::library;
+use crate::prelude::WindowHandle;
 
 #[repr(C)]
 pub struct XDisplay([u8; 0]);
@@ -25,10 +26,18 @@ pub type KeySym = XID;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct XWindow(pub(crate) c_ulong);
+pub struct XWindow(c_ulong);
 
 impl XWindow {
     pub const NONE: Self = XWindow(0);
+
+    pub unsafe fn raw(&self) -> c_ulong {
+        self.0
+    }
+
+    pub unsafe fn into_window_handle(&self) -> WindowHandle {
+        WindowHandle(self.0 as usize)
+    }
 }
 
 pub type Status = c_int;
