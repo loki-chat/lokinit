@@ -25,6 +25,12 @@ fn main() {
                 // MouseEvent::CursorMove(x, y) => println!("Cursor moved to ({x}, {y})"),
                 _ => {}
             },
+            EventKind::Keyboard(event) => match event {
+                KeyboardEvent::KeyPress(keycode) => println!("Key {keycode:?} pressed"),
+                KeyboardEvent::KeyRelease(keycode) => println!("Key {keycode:?} released"),
+                KeyboardEvent::KeyRepeat(keycode) => println!("Key {keycode:?} repeated"),
+                KeyboardEvent::ImeCommit(commit) => println!("IME commit -> {commit:?}"),
+            },
             EventKind::Resized(width, height) => println!("Window resized to ({width}, {height})"),
             _ => {}
         }
