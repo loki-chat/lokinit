@@ -320,6 +320,20 @@ impl LokinitCore {
                 });
             }
 
+            et::CONFIGURE_NOTIFY => {
+                let xevent = xevent.xconfigure;
+                let time = Duration::from_millis(0);
+
+                let handle = xevent.window.into_window_handle();
+                let window = self.windows.get(&handle).unwrap();
+
+                self.event_queue.push_back(Event {
+                    time,
+                    window: handle,
+                    kind: EventKind::Resized(xevent.width as u32, xevent.height as u32),
+                });
+            }
+
             et::DESTROY_NOTIFY => {
                 let xevent = xevent.xdestroywindow;
                 let time = Duration::from_millis(0);
