@@ -13,8 +13,8 @@ use crate::native::linux::x11::ffi::{LibX11, XEvent};
 use crate::prelude::{WindowBuilder, WindowHandle, WindowPos, WindowSize};
 
 use self::ffi::{
-    et, xclass, xcw, xevent_mask, xim, xn, Status, XDisplay, XErrorEvent, XKeyEvent, XPoint,
-    XSetWindowAttributes, XWindow, XID, X_BUFFER_OVERFLOW, _XIC, _XIM,
+    et, xclass, xcw, xevent_mask, xim, xn, Status, XConfigureEvent, XDisplay, XErrorEvent,
+    XKeyEvent, XPoint, XSetWindowAttributes, XWindow, XID, X_BUFFER_OVERFLOW, _XIC, _XIM,
 };
 
 use super::locale::{setlocale, LC_CTYPE};
@@ -334,13 +334,29 @@ impl LokinitCore {
                 let time = Duration::from_millis(0);
 
                 let handle = xevent.window.into_window_handle();
-                let window = self.windows.get(&handle).unwrap();
+                let window = self.windows.get_mut(&handle).unwrap();
 
-                self.event_queue.push_back(Event {
-                    time,
-                    window: handle,
-                    kind: EventKind::Resized(xevent.width as u32, xevent.height as u32),
-                });
+                let xwin_pos = WindowPos::new(xevent.x, xevent.y);
+                if xwin_pos != window.position {
+                    window.position = xwin_pos;
+
+                    self.event_queue.push_back(Event {
+                        time,
+                        window: handle,
+                        kind: EventKind::Moved(window.position.x, window.position.y),
+                    });
+                }
+
+                let xwin_size = WindowSize::new(xevent.width as u32, xevent.height as u32);
+                if xwin_size != window.size {
+                    window.size = xwin_size;
+
+                    self.event_queue.push_back(Event {
+                        time,
+                        window: handle,
+                        kind: EventKind::Resized(window.size.width, window.size.height),
+                    });
+                }
             }
 
             et::DESTROY_NOTIFY => {
