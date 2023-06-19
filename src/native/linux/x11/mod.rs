@@ -13,8 +13,8 @@ use crate::native::linux::x11::ffi::{LibX11, XEvent};
 use crate::prelude::{WindowBuilder, WindowHandle, WindowPos, WindowSize};
 
 use self::ffi::{
-    et, xclass, xcw, xevent_mask, xim, xn, Status, XDisplay, XErrorEvent, XPoint,
-    XSetWindowAttributes, XWindow, XID, X_BUFFER_OVERFLOW, _XIC, _XIM, XKeyEvent,
+    et, xclass, xcw, xevent_mask, xim, xn, Status, XDisplay, XErrorEvent, XKeyEvent, XPoint,
+    XSetWindowAttributes, XWindow, XID, X_BUFFER_OVERFLOW, _XIC, _XIM,
 };
 
 use super::locale::{setlocale, LC_CTYPE};
@@ -120,7 +120,6 @@ impl LokinitCore {
         &mut self,
         builder: WindowBuilder,
     ) -> Result<WindowHandle, X11CreateWindowError> {
-
         unsafe {
             let mut attributes = XSetWindowAttributes {
                 event_mask: xevent_mask::EXPOSURE
@@ -247,7 +246,8 @@ impl LokinitCore {
                 let handle = xevent.window.into_window_handle();
                 let window = self.windows.get(&handle).unwrap();
 
-                let (keysym, text) = utf8_lookup_string(&self.x11, &mut self.str_buffer, window, xevent);
+                let (keysym, text) =
+                    utf8_lookup_string(&self.x11, &mut self.str_buffer, window, xevent);
 
                 if let Some(keycode) = keysym::to_keycode(keysym.0 as u32) {
                     let kb_event = match (xevent.type_id, self.prev_key) {
@@ -262,19 +262,17 @@ impl LokinitCore {
                             self.prev_key = None;
                             KeyboardEvent::KeyRelease(keycode)
                         }
-                        (et::KEY_RELEASE, _) => {
-                            KeyboardEvent::KeyRelease(keycode)
-                        }
+                        (et::KEY_RELEASE, _) => KeyboardEvent::KeyRelease(keycode),
                         _ => unreachable!(),
                     };
 
                     // Send IME commit only on a non-repeated key press
                     let do_ime = matches!(kb_event, KeyboardEvent::KeyPress(_));
-    
+
                     self.event_queue.push_back(Event {
                         time,
                         window: handle,
-                        kind: EventKind::Keyboard(kb_event)
+                        kind: EventKind::Keyboard(kb_event),
                     });
 
                     if !do_ime {
@@ -434,7 +432,12 @@ unsafe fn place_ime(x11: &LibX11, xic: NonNull<_XIC>, place: XPoint) {
     (x11.XFree)(preedit_attr as *mut c_void);
 }
 
-unsafe fn utf8_lookup_string<'a>(x11: &LibX11, str_buffer: &'a mut Vec<u8>, window: &X11NativeWindow, mut xpress: XKeyEvent) -> (XID, Option<Cow<'a, str>>) {
+unsafe fn utf8_lookup_string<'a>(
+    x11: &LibX11,
+    str_buffer: &'a mut Vec<u8>,
+    window: &X11NativeWindow,
+    mut xpress: XKeyEvent,
+) -> (XID, Option<Cow<'a, str>>) {
     let mut keysym = XID(0);
     let mut status: Status = 0;
 
