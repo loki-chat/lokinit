@@ -315,6 +315,7 @@ library! {
     ) -> Status;
 
     pub fn XMapWindow(display: *mut XDisplay, window: XWindow);
+    pub fn XUnmapWindow(display: *mut XDisplay, window: XWindow);
 
     pub fn Xutf8LookupString(
         ic: XIC,

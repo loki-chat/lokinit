@@ -36,6 +36,10 @@ pub fn create_window(builder: WindowBuilder) -> Result<WindowHandle, CreateWindo
     with(|instance| instance.create_window(builder))
 }
 
+pub fn close_window(handle: WindowHandle) {
+    with(|instance| instance.close_window(handle))
+}
+
 pub fn poll_event() -> Option<Event> {
     with(|instance| instance.poll_event())
 }

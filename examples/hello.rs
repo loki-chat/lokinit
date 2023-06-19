@@ -6,32 +6,54 @@ fn main() {
             .title("Hello")
             .transparent(false)
             .centered(true)
-            .size(1280, 720),
+            .size(600, 400),
+    )
+    .unwrap();
+
+    core::create_window(
+        WindowBuilder::new()
+            .title("World")
+            .transparent(false)
+            .size(400, 600),
     )
     .unwrap();
 
     while let Some(event) = core::poll_event() {
+        let win = event.window;
+
         match event.kind {
             EventKind::Mouse(event) => match event {
                 MouseEvent::ButtonPress(btn, x, y) => {
-                    println!("Mouse button {btn:?} pressed at ({x}, {y})")
+                    println!("[{win:?}] Mouse button {btn:?} pressed at ({x}, {y})")
                 }
                 MouseEvent::ButtonRelease(btn, x, y) => {
-                    println!("Mouse button {btn:?} released at ({x}, {y})")
+                    println!("[{win:?}] Mouse button {btn:?} released at ({x}, {y})")
                 }
-                MouseEvent::CursorIn(x, y) => println!("Cursor entered window at ({x}, {y})"),
-                MouseEvent::CursorOut(x, y) => println!("Cursor exited window at ({x}, {y})"),
+                MouseEvent::CursorIn(x, y) => {
+                    println!("[{win:?}] Cursor entered window at ({x}, {y})")
+                }
+                MouseEvent::CursorOut(x, y) => {
+                    println!("[{win:?}] Cursor exited window at ({x}, {y})")
+                }
                 // Log spam warning: it's commented for a reason
                 // MouseEvent::CursorMove(x, y) => println!("Cursor moved to ({x}, {y})"),
                 _ => {}
             },
             EventKind::Keyboard(event) => match event {
-                KeyboardEvent::KeyPress(keycode) => println!("Key {keycode:?} pressed"),
-                KeyboardEvent::KeyRelease(keycode) => println!("Key {keycode:?} released"),
-                KeyboardEvent::KeyRepeat(keycode) => println!("Key {keycode:?} repeated"),
-                KeyboardEvent::ImeCommit(commit) => println!("IME commit -> {commit:?}"),
+                KeyboardEvent::KeyPress(keycode) => println!("[{win:?}] Key {keycode:?} pressed"),
+                KeyboardEvent::KeyRelease(keycode) => {
+                    println!("[{win:?}] Key {keycode:?} released")
+                }
+                KeyboardEvent::KeyRepeat(keycode) => println!("[{win:?}] Key {keycode:?} repeated"),
+                KeyboardEvent::ImeCommit(commit) => println!("[{win:?}] IME commit -> {commit:?}"),
             },
-            EventKind::Resized(width, height) => println!("Window resized to ({width}, {height})"),
+            EventKind::Resized(width, height) => {
+                println!("[{win:?}] Window resized to ({width}, {height})")
+            }
+            EventKind::CloseRequested => {
+                core::close_window(win);
+                println!("[{win:?}] Closed upon request");
+            }
             _ => {}
         }
     }

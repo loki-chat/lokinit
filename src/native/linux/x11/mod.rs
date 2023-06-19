@@ -62,7 +62,7 @@ pub struct LokinitCore {
     prev_key: Option<KeyCode>,
     is_composing: bool,
     str_buffer: Vec<u8>,
-    quit: bool,
+    n_windows: u32,
 }
 
 impl LokinitCore {
@@ -111,9 +111,13 @@ impl LokinitCore {
                 prev_key: None,
                 is_composing: false,
                 str_buffer: vec![0; 16],
-                quit: false,
+                n_windows: 0,
             })
         }
+    }
+
+    pub fn n_windows(&self) -> u32 {
+        self.n_windows
     }
 
     pub fn create_window(
@@ -193,11 +197,23 @@ impl LokinitCore {
                 },
             );
 
+            self.n_windows += 1;
             Ok(handle)
         }
     }
 
+    pub fn close_window(&mut self, handle: WindowHandle) {
+        let window = self.windows.remove(&handle).unwrap();
+        unsafe { (self.x11.XUnmapWindow)(self.display.as_ptr(), window.window) };
+        self.n_windows -= 1;
+    }
+
     pub fn poll_event(&mut self) -> Option<Event> {
+        if self.n_windows == 0 {
+            // No events to poll if there are no windows
+            return None;
+        }
+
         if let Some(win_event) = self.event_queue.pop_front() {
             return Some(win_event);
         }
@@ -223,11 +239,6 @@ impl LokinitCore {
                 }
 
                 (self.x11.XFlush)(self.display.as_ptr());
-
-                if self.quit {
-                    // return early if asked to quit
-                    return None;
-                }
 
                 win_event = self.event_queue.pop_front();
             }
@@ -366,7 +377,10 @@ impl LokinitCore {
                 let time = Duration::from_millis(xevent.time);
 
                 let handle = xevent.window.into_window_handle();
-                let window = self.windows.get(&handle).unwrap();
+                let Some(window) = self.windows.get(&handle) else {
+                    // A LEAVE_NOTIFY event will often be emitted right after a window has been closed.
+                    return;
+                };
 
                 let kind = if xevent.type_id == et::ENTER_NOTIFY {
                     EventKind::Mouse(MouseEvent::CursorIn(xevent.x, xevent.y))
@@ -383,12 +397,19 @@ impl LokinitCore {
 
             et::CLIENT_MESSAGE => {
                 let xevent = xevent.xclient;
+                let time = Duration::from_millis(0);
 
                 let handle = xevent.window.into_window_handle();
                 let window = self.windows.get(&handle).unwrap();
 
                 // if client requests to quit
-                self.quit |= xevent.data.l[0] as u64 == window.wm_delete_message;
+                if xevent.data.l[0] as u64 == window.wm_delete_message {
+                    self.event_queue.push_back(Event {
+                        time,
+                        window: handle,
+                        kind: EventKind::CloseRequested,
+                    })
+                }
             }
 
             _ => (),
