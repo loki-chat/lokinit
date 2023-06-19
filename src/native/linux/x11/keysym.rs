@@ -79,6 +79,7 @@ pub fn to_keycode(keysym: u32) -> Option<KeyCode> {
 
         0xff09 => KeyCode::Tab,
         0xffe5 => KeyCode::CapsLock,
+        0xff0d => KeyCode::Enter,
 
         0xffe1 => KeyCode::LShift,
         0xffe2 => KeyCode::RShift,

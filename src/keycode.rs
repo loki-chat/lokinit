@@ -89,6 +89,7 @@ pub enum KeyCode {
 
     Tab,
     CapsLock,
+    Enter,
 
     LShift,
     RShift,
