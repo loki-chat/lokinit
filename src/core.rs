@@ -1,5 +1,7 @@
 #![allow(unused)]
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use {
     crate::{
         event::Event,
@@ -24,10 +26,19 @@ thread_local! {
     pub static INSTANCE: RefCell<Option<LokinitCore>> = RefCell::new(None);
 }
 
+static INITIALIZED: AtomicBool = AtomicBool::new(false);
+
 pub fn with<R>(callback: impl FnOnce(&mut LokinitCore) -> R) -> R {
     INSTANCE.with(|instance| {
         let mut instance = instance.borrow_mut();
-        let instance = instance.get_or_insert_with(|| LokinitCore::init().unwrap());
+        let instance = instance.get_or_insert_with(|| {
+            if INITIALIZED.load(Ordering::Relaxed) {
+                panic!("Lokinit core has already been initialized");
+            }
+
+            INITIALIZED.store(true, Ordering::Release);
+            LokinitCore::init().unwrap()
+        });
         (callback)(instance)
     })
 }
