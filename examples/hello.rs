@@ -41,7 +41,7 @@ fn main() {
                 // Log spam warning: it's commented for a reason
                 // MouseEvent::CursorMove(x, y) => println!("Cursor moved to ({x}, {y})"),
                 _ => {}
-            },
+            }
             EventKind::Keyboard(event) => match event {
                 KeyboardEvent::KeyPress(keycode) => println!("[{win:?}] Key {keycode:?} pressed"),
                 KeyboardEvent::KeyRelease(keycode) => {
@@ -49,9 +49,12 @@ fn main() {
                 }
                 KeyboardEvent::KeyRepeat(keycode) => println!("[{win:?}] Key {keycode:?} repeated"),
                 KeyboardEvent::ImeCommit(commit) => println!("[{win:?}] IME commit -> {commit:?}"),
-            },
+            }
             EventKind::Resized(width, height) => {
                 println!("[{win:?}] Window resized to ({width}, {height})")
+            }
+            EventKind::Moved(x, y) => {
+                println!("[{win:?}] Window moved to ({x}, {y})")
             }
             EventKind::CloseRequested => {
                 lok::close_window(win);
