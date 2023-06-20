@@ -150,6 +150,9 @@ impl X11Backend {
                 &mut attributes,
             );
 
+            let title = CString::new(builder.title).unwrap();
+            (self.x11.XStoreName)(self.display.as_ptr(), window, title.as_ptr());
+
             // register interest in the delete window message
             let atom_name = CString::new("WM_DELETE_WINDOW").unwrap();
             let wm_delete_message =

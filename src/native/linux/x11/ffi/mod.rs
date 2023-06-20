@@ -328,6 +328,8 @@ library! {
 
     pub fn XSetLocaleModifiers(modifier_list: *const c_char) -> *mut c_char;
 
+    pub fn XStoreName(display: *mut XDisplay, window: XWindow, window_name: *const c_char);
+
     // Event Handling
 
     pub fn XPending(display: *mut XDisplay) -> c_int;
