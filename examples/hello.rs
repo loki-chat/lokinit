@@ -1,7 +1,8 @@
 use lokinit::prelude::*;
 
 fn main() {
-    core::init::<DefaultLokinitBackend>();
+    // hehe
+    lok::init();
 
     core::create_window(
         WindowBuilder::new()

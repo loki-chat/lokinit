@@ -10,6 +10,17 @@ pub mod prelude {
         Event, EventKind, KeyboardEvent, MouseButton, MouseEvent, TouchEvent, TouchPhase,
     };
     pub use crate::keycode::KeyCode;
+    pub use crate::lok;
     pub use crate::native::DefaultLokinitBackend;
     pub use crate::window::{WindowBuilder, WindowHandle, WindowPos, WindowSize};
+}
+
+pub mod lok {
+    use crate::core;
+    use crate::native::DefaultLokinitBackend;
+
+    /// Initializes Lokinit with a default backend.
+    pub fn init() {
+        core::init::<DefaultLokinitBackend>();
+    }
 }
