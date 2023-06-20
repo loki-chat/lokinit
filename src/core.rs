@@ -5,7 +5,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use {
     crate::{
         event::Event,
-        native::{CreateWindowError, LokinitCore, NativeCoreError},
         window::{WindowBuilder, WindowHandle, WindowPos, WindowSize},
     },
     std::{cell::RefCell, rc::Rc},
@@ -22,13 +21,32 @@ pub struct Monitor {
     hertz: u32,
 }
 
+#[derive(Clone, Debug)]
+pub struct CreateWindowError(pub Rc<str>);
+
+pub trait LokinitBackend {
+    fn init() -> Self
+    where
+        Self: Sized + 'static;
+
+    fn create_window(&mut self, builder: WindowBuilder) -> Result<WindowHandle, CreateWindowError>;
+    fn close_window(&mut self, handle: WindowHandle);
+
+    fn poll_event(&mut self) -> Option<Event>;
+
+    // TODO: implement monitor fetching in native backends
+    fn fetch_monitors(&mut self) -> Vec<Monitor> {
+        unimplemented!()
+    }
+}
+
 thread_local! {
-    pub static INSTANCE: RefCell<Option<LokinitCore>> = RefCell::new(None);
+    pub static INSTANCE: RefCell<Option<Box<dyn LokinitBackend>>> = RefCell::new(None);
 }
 
 static INITIALIZED: AtomicBool = AtomicBool::new(false);
 
-pub fn with<R>(callback: impl FnOnce(&mut LokinitCore) -> R) -> R {
+pub fn init<B: LokinitBackend + 'static>() {
     INSTANCE.with(|instance| {
         let mut instance = instance.borrow_mut();
         let instance = instance.get_or_insert_with(|| {
@@ -36,9 +54,17 @@ pub fn with<R>(callback: impl FnOnce(&mut LokinitCore) -> R) -> R {
                 panic!("Lokinit core has already been initialized");
             }
 
+            let backend = B::init();
             INITIALIZED.store(true, Ordering::Release);
-            LokinitCore::init().unwrap()
+            Box::new(backend)
         });
+    });
+}
+
+pub fn with<R>(callback: impl FnOnce(&mut dyn LokinitBackend) -> R) -> R {
+    INSTANCE.with(|instance| {
+        let mut instance = instance.borrow_mut();
+        let instance = instance.as_deref_mut().expect("Lokinit is not initialized");
         (callback)(instance)
     })
 }
@@ -55,8 +81,6 @@ pub fn poll_event() -> Option<Event> {
     with(|instance| instance.poll_event())
 }
 
-// TODO: implement monitor fetching
-
-// pub fn fetch_monitors() -> Vec<Monitor> {
-//     with(|instance| instance.fetch_monitors())
-// }
+pub fn fetch_monitors() -> Vec<Monitor> {
+    with(|instance| instance.fetch_monitors())
+}

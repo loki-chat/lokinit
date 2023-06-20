@@ -1,7 +1,14 @@
 use std::ffi::{c_void, CString};
 use std::ptr::NonNull;
+use std::rc::Rc;
 
-use self::dl::{dlopen, dlsym, get_dlerror, RTLD_NOW};
+use crate::core::{CreateWindowError, LokinitBackend};
+use crate::event::Event;
+use crate::window::{WindowBuilder, WindowHandle};
+
+use dl::{dlopen, dlsym, get_dlerror, RTLD_NOW};
+use wayland::WaylandBackend;
+use x11::X11Backend;
 
 mod dl;
 mod locale;
@@ -19,7 +26,7 @@ impl Library {
     /// Usually, Linux libraries are in the form `lib<name>.so`.
     ///
     /// This function *will* append the `lib` prefix and `.so` extension for you, so don't do it yourself.
-    pub fn new(name: &str) -> Result<Self, String> {
+    pub fn new(name: &str) -> Result<Self, Rc<str>> {
         let c_str = CString::new(format!("lib{}.so", name)).unwrap();
         let lib = unsafe { dlopen(c_str.as_ptr(), RTLD_NOW) };
 
@@ -32,7 +39,7 @@ impl Library {
         }
     }
 
-    pub fn get_sym<F: Sized>(&self, sym: &str) -> Result<F, String> {
+    pub fn get_sym<F: Sized>(&self, sym: &str) -> Result<F, Rc<str>> {
         let c_str = CString::new(sym).unwrap();
         let sym = unsafe { dlsym(self.handle.as_ptr(), c_str.as_ptr()) };
 
@@ -46,8 +53,8 @@ impl Library {
 
 #[derive(Clone, Debug)]
 pub enum LoadingError {
-    Library(String),
-    Symbol(String),
+    Library(Rc<str>),
+    Symbol(Rc<str>),
 }
 
 /// Generates a library struct that loads all the specified functions from the library at runtime.
@@ -72,4 +79,40 @@ macro_rules! library {
             }
         }
     };
+}
+
+pub enum LinuxBackend {
+    X11(X11Backend),
+    Wayland(WaylandBackend),
+}
+
+impl LokinitBackend for LinuxBackend {
+    fn init() -> Self
+    where
+        Self: Sized + 'static,
+    {
+        // TODO: wayland backend
+        Self::X11(X11Backend::init().unwrap())
+    }
+
+    fn create_window(&mut self, builder: WindowBuilder) -> Result<WindowHandle, CreateWindowError> {
+        match self {
+            Self::X11(x11) => x11.create_window(builder),
+            Self::Wayland(_wl) => todo!(),
+        }
+    }
+
+    fn close_window(&mut self, handle: WindowHandle) {
+        match self {
+            Self::X11(x11) => x11.close_window(handle),
+            Self::Wayland(_wl) => todo!(),
+        }
+    }
+
+    fn poll_event(&mut self) -> Option<Event> {
+        match self {
+            Self::X11(x11) => x11.poll_event(),
+            Self::Wayland(_wl) => todo!(),
+        }
+    }
 }

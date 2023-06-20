@@ -1,6 +1,9 @@
 use lokinit::prelude::*;
 
 fn main() {
+    // hehe
+    lok::init();
+
     core::create_window(
         WindowBuilder::new()
             .title("Hello")

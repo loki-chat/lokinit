@@ -1,6 +1,7 @@
 #![allow(unused)]
 
 use std::ffi::{c_char, c_int, c_void, CStr};
+use std::rc::Rc;
 
 // https://github.com/nagisa/rust_libloading/blob/master/src/os/unix/consts.rs
 pub const RTLD_LAZY: c_int = 1;
@@ -17,12 +18,12 @@ extern "C" {
 }
 
 /// A safe wrapper around dlerror
-pub fn get_dlerror() -> Option<String> {
+pub fn get_dlerror() -> Option<Rc<str>> {
     let err = unsafe { dlerror() };
     if err.is_null() {
         None
     } else {
         let c_str = unsafe { CStr::from_ptr(err) };
-        Some(c_str.to_str().unwrap().to_owned())
+        Some(c_str.to_str().unwrap().into())
     }
 }

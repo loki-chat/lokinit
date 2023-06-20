@@ -22,10 +22,7 @@ pub use android;
 pub use ios;
 
 #[cfg(target_os = "linux")]
-pub use linux::{
-    x11::{CreateWindowError, LokinitCore, NativeCoreError},
-    LoadingError,
-};
+pub type DefaultLokinitBackend = linux::LinuxBackend;
 
 #[cfg(target_os = "macos")]
 pub use macos::{CreateWindowError, LokinitCore, NativeCoreError};
