@@ -6,6 +6,7 @@ use std::ffi::{c_int, c_void, CString};
 use std::ptr::{null, null_mut, NonNull};
 use std::time::{Duration, Instant, SystemTime};
 
+use crate::core::CreateWindowError;
 use crate::event::{Event, EventKind, KeyboardEvent, MouseButton, MouseEvent};
 use crate::keycode::KeyCode;
 use crate::library;
@@ -23,9 +24,6 @@ use super::LoadingError;
 mod ffi;
 mod keysym;
 
-pub type NativeCoreError = X11NativeCoreError;
-pub type CreateWindowError = X11CreateWindowError;
-
 #[derive(Clone, Debug)]
 pub enum X11NativeCoreError {
     LibLoading(LoadingError),
@@ -39,11 +37,6 @@ impl From<LoadingError> for X11NativeCoreError {
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum X11CreateWindowError {
-    CannotOpenInputContext,
-}
-
 pub struct X11NativeWindow {
     window: XWindow,
     position: WindowPos,
@@ -52,7 +45,7 @@ pub struct X11NativeWindow {
     xic: NonNull<_XIC>,
 }
 
-pub struct LokinitCore {
+pub struct X11Backend {
     x11: LibX11,
     root: XWindow,
     xim: NonNull<_XIM>,
@@ -65,7 +58,7 @@ pub struct LokinitCore {
     n_windows: u32,
 }
 
-impl LokinitCore {
+impl X11Backend {
     pub fn init() -> Result<Self, X11NativeCoreError> {
         unsafe {
             let x11 = LibX11::new()?;
@@ -123,7 +116,7 @@ impl LokinitCore {
     pub fn create_window(
         &mut self,
         builder: WindowBuilder,
-    ) -> Result<WindowHandle, X11CreateWindowError> {
+    ) -> Result<WindowHandle, CreateWindowError> {
         unsafe {
             let mut attributes = XSetWindowAttributes {
                 event_mask: xevent_mask::EXPOSURE
@@ -175,7 +168,8 @@ impl LokinitCore {
                 window,
                 null_mut::<c_void>(),
             );
-            let xic = NonNull::new(xic).ok_or(X11CreateWindowError::CannotOpenInputContext)?;
+            let xic =
+                NonNull::new(xic).ok_or(CreateWindowError("cannot open X11 display".into()))?;
 
             // select IME and position it
             (self.x11.XSetICFocus)(xic.as_ptr());
@@ -249,7 +243,7 @@ impl LokinitCore {
 
     /// Transform an `XEvent` into one or more Lokinit `Event`s and push them into the event queue.
     /// Returns `Some(())` if the window emitting the event exists, `None` otherwise.
-    /// 
+    ///
     /// > **Note:** A `LEAVE_NOTIFY` event will often be emitted right after a window has been closed.
     unsafe fn process_event(&mut self, xevent: &XEvent) -> Option<()> {
         match xevent.type_id {

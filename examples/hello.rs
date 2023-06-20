@@ -1,6 +1,8 @@
 use lokinit::prelude::*;
 
 fn main() {
+    core::init::<DefaultLokinitBackend>();
+
     core::create_window(
         WindowBuilder::new()
             .title("Hello")
