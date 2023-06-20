@@ -248,14 +248,17 @@ impl LokinitCore {
     }
 
     /// Transform an `XEvent` into one or more Lokinit `Event`s and push them into the event queue.
-    unsafe fn process_event(&mut self, xevent: &XEvent) {
+    /// Returns `Some(())` if the window emitting the event exists, `None` otherwise.
+    /// 
+    /// > **Note:** A `LEAVE_NOTIFY` event will often be emitted right after a window has been closed.
+    unsafe fn process_event(&mut self, xevent: &XEvent) -> Option<()> {
         match xevent.type_id {
             et::KEY_PRESS | et::KEY_RELEASE => {
                 let xevent = xevent.xkey;
                 let time = Duration::from_millis(xevent.time);
 
                 let handle = xevent.window.into_window_handle();
-                let window = self.windows.get(&handle).unwrap();
+                let window = self.windows.get(&handle)?;
 
                 let (keysym, text) =
                     utf8_lookup_string(&self.x11, &mut self.str_buffer, window, xevent);
@@ -287,7 +290,7 @@ impl LokinitCore {
                     });
 
                     if !do_ime {
-                        return;
+                        return Some(());
                     }
                 };
 
@@ -307,7 +310,7 @@ impl LokinitCore {
                 let time = Duration::from_millis(xevent.time);
 
                 let handle = xevent.window.into_window_handle();
-                let window = self.windows.get(&handle).unwrap();
+                let window = self.windows.get(&handle)?;
 
                 let mouse_button = match xevent.button {
                     1 => MouseButton::Left,
@@ -334,7 +337,7 @@ impl LokinitCore {
                 let time = Duration::from_millis(0);
 
                 let handle = xevent.window.into_window_handle();
-                let window = self.windows.get_mut(&handle).unwrap();
+                let window = self.windows.get_mut(&handle)?;
 
                 let xwin_pos = WindowPos::new(xevent.x, xevent.y);
                 if xwin_pos != window.position {
@@ -364,7 +367,7 @@ impl LokinitCore {
                 let time = Duration::from_millis(0);
 
                 let handle = xevent.window.into_window_handle();
-                let window = self.windows.get(&handle).unwrap();
+                let window = self.windows.get(&handle)?;
 
                 self.event_queue.push_back(Event {
                     time,
@@ -377,9 +380,8 @@ impl LokinitCore {
                 let xevent = xevent.xmotion;
                 let time = Duration::from_millis(xevent.time);
 
-                let (&handle, _window) = (self.windows.iter())
-                    .find(|(_h, w)| w.window == xevent.window)
-                    .unwrap();
+                let handle = xevent.window.into_window_handle();
+                let window = self.windows.get(&handle)?;
 
                 self.event_queue.push_back(Event {
                     time,
@@ -393,10 +395,7 @@ impl LokinitCore {
                 let time = Duration::from_millis(xevent.time);
 
                 let handle = xevent.window.into_window_handle();
-                let Some(window) = self.windows.get(&handle) else {
-                    // A LEAVE_NOTIFY event will often be emitted right after a window has been closed.
-                    return;
-                };
+                let window = self.windows.get(&handle)?;
 
                 let kind = if xevent.type_id == et::ENTER_NOTIFY {
                     EventKind::Mouse(MouseEvent::CursorIn(xevent.x, xevent.y))
@@ -416,7 +415,7 @@ impl LokinitCore {
                 let time = Duration::from_millis(0);
 
                 let handle = xevent.window.into_window_handle();
-                let window = self.windows.get(&handle).unwrap();
+                let window = self.windows.get(&handle)?;
 
                 // if client requests to quit
                 if xevent.data.l[0] as u64 == window.wm_delete_message {
@@ -430,6 +429,8 @@ impl LokinitCore {
 
             _ => (),
         }
+
+        Some(())
     }
 
     fn get_window(&self, window: WindowHandle) -> &X11NativeWindow {
