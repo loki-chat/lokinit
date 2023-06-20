@@ -1,4 +1,4 @@
-use crate::core::MonitorId;
+use crate::lok::MonitorId;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct WindowPos {

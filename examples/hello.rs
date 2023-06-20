@@ -4,7 +4,7 @@ fn main() {
     // hehe
     lok::init();
 
-    core::create_window(
+    lok::create_window(
         WindowBuilder::new()
             .title("Hello")
             .transparent(false)
@@ -13,7 +13,7 @@ fn main() {
     )
     .unwrap();
 
-    core::create_window(
+    lok::create_window(
         WindowBuilder::new()
             .title("World")
             .transparent(false)
@@ -21,7 +21,7 @@ fn main() {
     )
     .unwrap();
 
-    while let Some(event) = core::poll_event() {
+    while let Some(event) = lok::poll_event() {
         let win = event.window;
 
         match event.kind {
@@ -54,7 +54,7 @@ fn main() {
                 println!("[{win:?}] Window resized to ({width}, {height})")
             }
             EventKind::CloseRequested => {
-                core::close_window(win);
+                lok::close_window(win);
                 println!("[{win:?}] Closed upon request");
             }
             _ => {}

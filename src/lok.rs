@@ -1,6 +1,10 @@
+//! The core of Lokinit, where a Lokinit backend is initialized as a global mutable state.
+
 #![allow(unused)]
 
 use std::sync::atomic::{AtomicBool, Ordering};
+
+use crate::native::DefaultLokinitBackend;
 
 use {
     crate::{
@@ -46,7 +50,12 @@ thread_local! {
 
 static INITIALIZED: AtomicBool = AtomicBool::new(false);
 
-pub fn init<B: LokinitBackend + 'static>() {
+/// Initializes Lokinit with a default backend.
+pub fn init() {
+    init_backend::<DefaultLokinitBackend>();
+}
+
+pub fn init_backend<B: LokinitBackend + 'static>() {
     INSTANCE.with(|instance| {
         let mut instance = instance.borrow_mut();
         let instance = instance.get_or_insert_with(|| {

@@ -6,10 +6,10 @@ use std::ffi::{c_int, c_void, CString};
 use std::ptr::{null, null_mut, NonNull};
 use std::time::{Duration, Instant, SystemTime};
 
-use crate::core::CreateWindowError;
 use crate::event::{Event, EventKind, KeyboardEvent, MouseButton, MouseEvent};
 use crate::keycode::KeyCode;
 use crate::library;
+use crate::lok::CreateWindowError;
 use crate::native::linux::x11::ffi::{LibX11, XEvent};
 use crate::prelude::{WindowBuilder, WindowHandle, WindowPos, WindowSize};
 

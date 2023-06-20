@@ -2,8 +2,8 @@ use std::ffi::{c_void, CString};
 use std::ptr::NonNull;
 use std::rc::Rc;
 
-use crate::core::{CreateWindowError, LokinitBackend};
 use crate::event::Event;
+use crate::lok::{CreateWindowError, LokinitBackend};
 use crate::window::{WindowBuilder, WindowHandle};
 
 use dl::{dlopen, dlsym, get_dlerror, RTLD_NOW};
