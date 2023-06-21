@@ -25,7 +25,7 @@ pub use ios;
 pub type DefaultLokinitBackend = linux::LinuxBackend;
 
 #[cfg(target_os = "macos")]
-pub use macos::{CreateWindowError, LokinitCore, NativeCoreError};
+pub type DefaultLokinitBackend = macos::MacosBackend;
 
 #[cfg(target_os = "windows")]
 pub use windows;

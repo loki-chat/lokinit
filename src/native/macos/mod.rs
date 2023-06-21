@@ -1,14 +1,10 @@
+use crate::lok::{CreateWindowError, LokinitBackend};
+
 mod ffi_rust;
 mod ffi_swift;
 
-#[derive(Debug)]
-pub enum NativeCoreError {}
-#[derive(Debug)]
-pub enum CreateWindowError {}
-
 use {
     crate::{
-        core::Monitor,
         event::Event,
         window::{WindowBuilder, WindowHandle},
     },
@@ -19,23 +15,18 @@ thread_local! {
     static EVENT_QUEUE: RefCell<VecDeque<Event>> = RefCell::new(VecDeque::new());
 }
 
-pub struct LokinitCore;
+pub struct MacosBackend;
 
-impl LokinitCore {
-    pub fn init() -> Result<Self, NativeCoreError> {
+impl LokinitBackend for MacosBackend {
+    fn init() -> Self {
         unsafe { ffi_swift::setup() };
-        Ok(Self)
+        Self
     }
 
-    pub fn fetch_monitors() -> Vec<Monitor> {
-        todo!()
-    }
+    fn create_window(&mut self, builder: WindowBuilder) -> Result<WindowHandle, CreateWindowError> {
+        let title = CString::new(builder.title)
+            .map_err(|e| CreateWindowError(format!("Invalid window title: {}", e).into()))?;
 
-    pub fn create_window(
-        &mut self,
-        builder: WindowBuilder,
-    ) -> Result<WindowHandle, CreateWindowError> {
-        let title = CString::new(builder.title).expect("Invalid window title");
         let window_id = unsafe {
             ffi_swift::create_window(
                 builder.size.width as i64,
@@ -47,7 +38,11 @@ impl LokinitCore {
         Ok(WindowHandle(window_id as usize))
     }
 
-    pub fn poll_event(&self) -> Option<Event> {
+    fn close_window(&mut self, handle: WindowHandle) {
+        todo!()
+    }
+
+    fn poll_event(&mut self) -> Option<Event> {
         let mut event = None;
         while event.is_none() {
             // update() will return `True` if the app should terminate

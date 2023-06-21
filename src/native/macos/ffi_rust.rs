@@ -1,14 +1,11 @@
 //! FFI functions for Swift to use
 
-use crate::event::{MouseButton, MouseEvent};
-
 use {
     super::{
         ffi_swift::{SwiftMouseButton, SwiftMouseEvent},
         EVENT_QUEUE,
     },
     crate::{
-        core,
         event::{Event, EventKind},
         window::WindowHandle,
     },
