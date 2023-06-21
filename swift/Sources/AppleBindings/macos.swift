@@ -9,7 +9,7 @@ public class MacOSWindow: NSWindow, NSWindowDelegate {
         NSWindow.StyleMask.miniaturizable.rawValue |
         NSWindow.StyleMask.resizable.rawValue
         
-    init(_ size: NSRect, _ title: String) {
+    init(_ size: NSRect, _ centered: Bool, _ title: String) {
         super.init(
             contentRect: size,
             styleMask: NSWindow.StyleMask.init(rawValue: Self.masks),
@@ -20,7 +20,10 @@ public class MacOSWindow: NSWindow, NSWindowDelegate {
         self.acceptsMouseMovedEvents = true
         self.title = title
         self.delegate = self
-        self.center()
+
+        if centered {
+            self.center()
+        }
 
         let view = MacOSView.init(size, UInt64(self.windowNumber))
         self.contentView = view

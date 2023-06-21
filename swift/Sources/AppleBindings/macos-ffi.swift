@@ -11,10 +11,10 @@ func ffiSetup() {
 }
 
 @_cdecl("create_window")
-func ffiCreateWindow(width: Int64, height: Int64, title: UnsafePointer<CChar>) -> UInt64 {
+func ffiCreateWindow(x: Int, y: Int, width: Int, height: Int, centered: Bool, title: UnsafePointer<CChar>) -> UInt64 {
     let title = String.init(cString: title)
-    let size = NSRect.init(x: 0, y: 0, width: Int(width), height: Int(height))
-    let window = MacOSWindow.init(size, title)
+    let size = NSRect.init(x: x, y: y, width: width, height: height)
+    let window = MacOSWindow.init(size, centered, title)
     return UInt64(window.windowNumber)
 }
 

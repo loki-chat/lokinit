@@ -55,5 +55,5 @@ Legend:
 | Raw Device Events       | ❌       | ❌     | ❌         | ❌             | ❌       | ❌       |
 | Gamepad/Joystick events | ❌       | ❌     | ❌         | ❌             | ❌       | ❌       |
 | Device movement events  | ❌       | ❌     | ❌         | ❌             | ❌       | ❌       |
-| Drag window with cursor | ❌       | ❌     | ✔️         | ❌             | **N/A** | **N/A** |
+| Drag window with cursor | ❌       | ✔️     | ✔️         | ❌             | **N/A** | **N/A** |
 | Resize with cursor      | ❌       | ❓     | ✔️         | ❌             | **N/A** | **N/A** |

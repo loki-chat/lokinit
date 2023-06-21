@@ -29,8 +29,11 @@ impl LokinitBackend for MacosBackend {
 
         let window_id = unsafe {
             ffi_swift::create_window(
-                builder.size.width as i64,
-                builder.size.height as i64,
+                builder.position.x,
+                builder.position.y,
+                builder.size.width as i32,
+                builder.size.height as i32,
+                builder.centered,
                 title.as_ptr(),
             )
         };

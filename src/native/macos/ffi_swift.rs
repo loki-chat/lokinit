@@ -2,7 +2,7 @@
 
 use {
     crate::event::{MouseButton, MouseEvent},
-    std::ffi::{c_char, c_void},
+    std::ffi::c_char,
 };
 
 /// The MouseButton enum, exported for Swift
@@ -29,6 +29,7 @@ pub enum SwiftMouseEvent {
     Released = 1,
     Moved = 2,
 }
+
 impl SwiftMouseEvent {
     /// Translates the SwiftMouseEvent enum into Lokinit's MouseEvent enum
     pub fn into_mouse_event(self, x: f64, y: f64, button: SwiftMouseButton) -> MouseEvent {
@@ -47,8 +48,17 @@ impl SwiftMouseEvent {
 extern "C" {
     /// Initializes the NSApplication
     pub fn setup();
+
     /// Creates a new window
-    pub fn create_window(width: i64, height: i64, title: *const c_char) -> u64;
+    pub fn create_window(
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        centered: bool,
+        title: *const c_char,
+    ) -> u64;
+
     /// Updates the app state by processing queued events in the NSApplication.
     ///
     /// Without manually calling this to update events, we'd have to use
