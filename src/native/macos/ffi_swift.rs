@@ -1,47 +1,96 @@
 //! Bindings to the external Swift code
 
 use {
-    crate::event::{MouseButton, MouseEvent},
-    std::ffi::c_char,
+    crate::{
+        event::{Event, EventKind, MouseButton, MouseEvent},
+        window::WindowHandle,
+    },
+    std::{ffi::c_char, time::Duration},
 };
 
-/// The MouseButton enum, exported for Swift
 #[repr(i32)]
-pub enum SwiftMouseButton {
-    Left = 0,
-    Middle = 1,
-    Right = 2,
-}
-impl From<SwiftMouseButton> for MouseButton {
-    fn from(value: SwiftMouseButton) -> Self {
-        match value {
-            SwiftMouseButton::Left => MouseButton::Left,
-            SwiftMouseButton::Right => MouseButton::Right,
-            SwiftMouseButton::Middle => MouseButton::Middle,
-        }
-    }
-}
+#[derive(Debug)]
+pub enum SwiftEventType {
+    MouseDownLeft,
+    MouseDownMiddle,
+    MouseDownRight,
+    MouseDownOther,
 
-/// The MouseEvent enum, exported for Swift
-#[repr(i32)]
-pub enum SwiftMouseEvent {
-    Pressed = 0,
-    Released = 1,
-    Moved = 2,
+    MouseUpLeft,
+    MouseUpMiddle,
+    MouseUpRight,
+    MouseUpOther,
+
+    MouseMoved,
+    MouseEntered,
+    MouseExited,
+    MouseScrolled,
+
+    WindowResized,
+
+    KeyPressed,
+    KeyReleased,
+    KeyRepeated,
+
+    AppQuit,
 }
+#[repr(C)]
+pub struct SwiftEvent {
+    pub kind: SwiftEventType,
+    pub data1: i32,
+    pub data2: i32,
+    pub data3: i32,
+    pub window: usize,
+}
+impl TryInto<Event> for SwiftEvent {
+    type Error = ();
 
-impl SwiftMouseEvent {
-    /// Translates the SwiftMouseEvent enum into Lokinit's MouseEvent enum
-    pub fn into_mouse_event(self, x: f64, y: f64, button: SwiftMouseButton) -> MouseEvent {
-        let x = x as i32;
-        let y = y as i32;
-        let button = button.into();
+    fn try_into(self) -> Result<Event, Self::Error> {
+        let kind = match self.kind {
+            SwiftEventType::MouseDownLeft => EventKind::Mouse(MouseEvent::ButtonPress(
+                MouseButton::Left,
+                self.data1,
+                self.data2,
+            )),
+            SwiftEventType::MouseUpLeft => EventKind::Mouse(MouseEvent::ButtonRelease(
+                MouseButton::Left,
+                self.data1,
+                self.data2,
+            )),
+            SwiftEventType::MouseDownRight => EventKind::Mouse(MouseEvent::ButtonPress(
+                MouseButton::Right,
+                self.data1,
+                self.data2,
+            )),
+            SwiftEventType::MouseUpRight => EventKind::Mouse(MouseEvent::ButtonRelease(
+                MouseButton::Right,
+                self.data1,
+                self.data2,
+            )),
+            SwiftEventType::MouseDownOther => EventKind::Mouse(MouseEvent::ButtonPress(
+                MouseButton::Other(self.data3.try_into().unwrap()),
+                self.data1,
+                self.data2,
+            )),
+            SwiftEventType::MouseUpOther => EventKind::Mouse(MouseEvent::ButtonRelease(
+                MouseButton::Other(self.data3.try_into().unwrap()),
+                self.data1,
+                self.data2,
+            )),
+            SwiftEventType::MouseMoved => {
+                EventKind::Mouse(MouseEvent::CursorMove(self.data1, self.data2))
+            }
+            SwiftEventType::WindowResized => {
+                EventKind::Resized(self.data1 as u32, self.data2 as u32)
+            }
+            _ => return Err(()),
+        };
 
-        match self {
-            Self::Pressed => MouseEvent::ButtonPress(button, x, y),
-            Self::Released => MouseEvent::ButtonRelease(button, x, y),
-            Self::Moved => MouseEvent::CursorMove(x, y),
-        }
+        Ok(Event {
+            time: Duration::ZERO,
+            window: WindowHandle(self.window),
+            kind,
+        })
     }
 }
 
@@ -66,5 +115,5 @@ extern "C" {
     /// the event loop. Instead, Lokinit calls this each time `poll_event()`
     /// is called, which updates the app state without getting stuck in Apple's
     /// run loop.
-    pub fn update() -> bool;
+    pub fn update() -> SwiftEvent;
 }

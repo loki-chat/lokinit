@@ -46,14 +46,6 @@ impl LokinitBackend for MacosBackend {
     }
 
     fn poll_event(&mut self) -> Option<Event> {
-        let mut event = None;
-        while event.is_none() {
-            // update() will return `True` if the app should terminate
-            if unsafe { ffi_swift::update() } {
-                return None;
-            }
-            event = EVENT_QUEUE.with(|queue| queue.borrow_mut().pop_front());
-        }
-        event
+        unsafe { ffi_swift::update() }.try_into().ok()
     }
 }

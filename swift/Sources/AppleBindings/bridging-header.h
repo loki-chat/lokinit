@@ -1,5 +1,37 @@
 #include <CoreFoundation/CFAvailability.h>
 
+// Swift repr of the events
+typedef CF_ENUM(int, LokEventType) {
+    MouseDownLeft,
+    MouseDownMiddle,
+    MouseDownRight,
+    MouseDownOther,
+
+    MouseUpLeft,
+    MouseUpMiddle,
+    MouseUpRight,
+    MouseUpOther,
+
+    MouseMoved,
+    MouseEntered,
+    MouseExited,
+    MouseScrolled,
+
+    WindowResized,
+
+    KeyPressed,
+    KeyReleased,
+    KeyRepeated,
+
+    AppQuit
+};
+struct LokEvent {
+    LokEventType type;
+    int data1;
+    int data2;
+    int data3;
+    unsigned long window;
+};
 // Swift representation of the MouseButton and MouseEvent enums
 typedef CF_ENUM(int, MouseButton) {
     Left = 0,

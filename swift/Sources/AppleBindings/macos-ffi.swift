@@ -1,42 +1,117 @@
 #if os(macOS)
 
+import Foundation
 import AppKit
 
 @_cdecl("setup")
 func ffiSetup() {
-    let nsApp = NSApplication.shared
-    nsApp.setActivationPolicy(NSApplication.ActivationPolicy.regular)
-    nsApp.activate(ignoringOtherApps: true)
-    nsApp.finishLaunching()
+    // Init NSApplication
+    let NSApp = NSApplication.shared
+    NSApp.setActivationPolicy(.regular)
+    NSApp.activate(ignoringOtherApps: true)
+    NSApp.finishLaunching()
 }
 
 @_cdecl("create_window")
 func ffiCreateWindow(x: Int, y: Int, width: Int, height: Int, centered: Bool, title: UnsafePointer<CChar>) -> UInt64 {
-    let title = String.init(cString: title)
-    let size = NSRect.init(x: x, y: y, width: width, height: height)
-    let window = MacOSWindow.init(size, centered, title)
+    let title = String(cString: title)
+    let size = NSRect(x: x, y: y, width: width, height: height)
+    let window = BSWindow(size, centered, title)
     return UInt64(window.windowNumber)
 }
 
 @_cdecl("update")
-func ffiUpdate() -> Bool {
-    if NSApp.windows.count == 0 {
-        return true
-    }
+func ffiUpdate() -> LokEvent { 
     while true {
+        if NSApp.windows.count == 0 {
+            print("Swift: quitting due to lack of windows")
+            return LokEvent(.AppQuit, 0)
+        }
         let event = NSApp.nextEvent(
             matching: NSEvent.EventTypeMask.any,
-            until: nil,
+            until: Date.distantFuture,
             inMode: RunLoop.Mode.default,
             dequeue: true
-        )
-        if event == nil {
-            break
+        )!
+        switch event.type {
+        case .appKitDefined:
+            switch event.subtype {
+            // So far as I can tell, these events use private APIs, so we have to use sendEvent
+            case .applicationActivated:
+                NSApp.sendEvent(event)
+            case .applicationDeactivated:
+                NSApp.sendEvent(event)
+            case .screenChanged:
+                fatalError("screenChanged event not yet handled")
+            case .windowExposed:
+                fatalError("windowExposed event not yet implemented")
+            case .windowMoved:
+                event.window!.sendEvent(event)
+            default:
+                continue
+            }
+        case .systemDefined:
+            switch event.subtype {
+            case .powerOff:
+                fatalError("powerOff event not yet handled")
+            default:
+                continue
+            }
+        case .leftMouseDown:
+            let window = event.window! as! BSWindow
+            let handled = window.leftButtonDownHandler(event)
+            if !handled {
+                let mousePos = window.getMouseLocation()
+                return LokEvent(.MouseDownLeft, Int32(mousePos.x), Int32(mousePos.y), UInt(window.windowNumber))
+            }
+        case .leftMouseDragged:
+            let window = event.window! as! BSWindow
+            let forwardEvent = window.leftButtonDraggedHandler(event)
+            if let event = forwardEvent {
+                return event
+            }
+        case .leftMouseUp:
+            let window = event.window! as! BSWindow
+            let handled = window.leftButtonUpHandler(event)
+            if !handled {
+                let mousePos = window.getMouseLocation()
+                return LokEvent(.MouseUpLeft, Int32(mousePos.x), Int32(mousePos.y), UInt(window.windowNumber))
+            }
+        case .rightMouseDown:
+            let window = event.window! as! BSWindow
+            let mousePos = window.getMouseLocation()
+            return LokEvent(.MouseDownRight, Int32(mousePos.x), Int32(mousePos.y), UInt(window.windowNumber))
+        case .rightMouseDragged:
+            let window = event.window! as! BSWindow
+            let mousePos = window.getMouseLocation()
+            return LokEvent(.MouseMoved, Int32(mousePos.x), Int32(mousePos.y), UInt(window.windowNumber))
+        case .rightMouseUp:
+            let window = event.window! as! BSWindow
+            let mousePos = window.getMouseLocation()
+            return LokEvent(.MouseUpRight, Int32(mousePos.x), Int32(mousePos.y), UInt(window.windowNumber))
+        case .otherMouseDown:
+            let window = event.window! as! BSWindow
+            let mousePos = window.getMouseLocation()
+            return LokEvent(.MouseDownOther, Int32(mousePos.x), Int32(mousePos.y), Int32(event.buttonNumber), UInt(window.windowNumber))
+        case .otherMouseDragged:
+            let window = event.window! as! BSWindow
+            let mousePos = window.getMouseLocation()
+            return LokEvent(.MouseMoved, Int32(mousePos.x), Int32(mousePos.y), UInt(window.windowNumber))
+        case .otherMouseUp:
+            let window = event.window! as! BSWindow
+            let mousePos = window.getMouseLocation()
+            return LokEvent(.MouseUpOther, Int32(mousePos.x), Int32(mousePos.y), Int32(event.buttonNumber), UInt(window.windowNumber))
+        case .mouseMoved:
+            let window = NSApp.frontWindow as! BSWindow
+            let handled = window.mouseMovedHandler(event)
+            if !handled {
+                let mousePos = window.getMouseLocation()
+                return LokEvent(.MouseMoved, Int32(mousePos.x), Int32(mousePos.y), UInt(window.windowNumber))
+            }
+        default:
+            continue
         }
-
-        NSApp.sendEvent(event!)
     }
-    return false
 }
 
 #endif
