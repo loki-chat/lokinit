@@ -61,15 +61,19 @@ public class BSWindow: NSWindow {
         if centered {
             self.center()
         }
+
+        self.disableCursorRects()
     }
     
     // Mouse press down handler for windows
     // Returns true if the event was handled, false if it wasn't
     func leftButtonDownHandler(_ event: NSEvent) -> Bool {
         if !self.isMainWindow {
-            print("Making self main window due to click")
+            // print("Making self main window due to click")
+            // Yes... we need all 3 of these just to make the window the main window :dawae:
             self.makeKeyAndOrderFront(nil)
             self.makeMain()
+            self.becomeMain()
         }
         
         if let border = self.checkMouseInBorder() {
@@ -196,7 +200,6 @@ public class BSWindow: NSWindow {
             }
             return true
         } else if self.nonDefaultCursor {
-            self.setCursor(NSCursor.crosshair)
             self.setCursor(NSCursor.arrow, false)
         }
         
@@ -337,7 +340,6 @@ public class BSWindow: NSWindow {
 
     // Changes the cursor icon
     func setCursor(_ cursor: NSCursor, _ nonDefault: Bool = true) {
-        self.resetCursorRects()
         cursor.set()
         self.nonDefaultCursor = nonDefault
     }

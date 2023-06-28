@@ -11,6 +11,7 @@ public struct BSCursor {
     public static let windowResizeEastWest: NSCursor = fetchHICursor("resizeeastwest")
     public static let windowResizeNorthEastSouthWest: NSCursor = fetchHICursor("resizenortheastsouthwest")
     public static let windowResizeNorthWestSouthEast: NSCursor = fetchHICursor("resizenorthwestsoutheast")
+    public static let empty: NSCursor = NSCursor(image: NSImage(size: NSSize.zero), hotSpot: NSPoint.zero)
     
     // Loads cursors from HIServices.framework
     // https://stackoverflow.com/a/21786835/19707043
