@@ -46,7 +46,14 @@ func ffiUpdate() -> LokEvent {
             case .windowExposed:
                 fatalError("windowExposed event not yet implemented")
             case .windowMoved:
-                event.window!.sendEvent(event)
+                let window = event.window!
+                window.sendEvent(event)
+                return LokEvent(
+                    .WindowMoved,
+                    Int32(window.frame.origin.x),
+                    Int32(window.frame.origin.y),
+                    UInt(window.windowNumber)
+                )
             default:
                 continue
             }

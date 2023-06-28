@@ -152,7 +152,7 @@ public class BSWindow: NSWindow {
             }
             
             // Make sure the resized window has a valid size; it might break the window otherwise
-            if rect.width > Self.minimumWindowSize.width && rect.height > Self.minimumWindowSize.height {
+            if rect.size.width > Self.minimumWindowSize.width && rect.size.height > Self.minimumWindowSize.height {
                 self.setFrame(rect, display: true, animate: false)
                 
                 return LokEvent(.WindowResized, Int32(rect.width), Int32(rect.height), UInt(event.window!.windowNumber))

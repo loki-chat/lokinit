@@ -27,6 +27,7 @@ pub enum SwiftEventType {
     MouseScrolled,
 
     WindowResized,
+    WindowMoved,
 
     KeyPressed,
     KeyReleased,
@@ -83,6 +84,7 @@ impl TryInto<Event> for SwiftEvent {
             SwiftEventType::WindowResized => {
                 EventKind::Resized(self.data1 as u32, self.data2 as u32)
             }
+            SwiftEventType::WindowMoved => EventKind::Moved(self.data1, self.data2),
             _ => return Err(()),
         };
 

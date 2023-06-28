@@ -18,6 +18,7 @@ typedef CF_ENUM(int, LokEventType) {
     MouseScrolled,
 
     WindowResized,
+    WindowMoved,
 
     KeyPressed,
     KeyReleased,
