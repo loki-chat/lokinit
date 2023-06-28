@@ -11,10 +11,6 @@ use {
     std::{cell::RefCell, collections::VecDeque, ffi::CString},
 };
 
-thread_local! {
-    static EVENT_QUEUE: RefCell<VecDeque<Event>> = RefCell::new(VecDeque::new());
-}
-
 pub struct MacosBackend;
 
 impl LokinitBackend for MacosBackend {

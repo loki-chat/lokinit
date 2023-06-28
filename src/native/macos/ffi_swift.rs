@@ -9,7 +9,7 @@ use {
 };
 
 #[repr(i32)]
-#[derive(Debug)]
+#[allow(dead_code)]
 pub enum SwiftEventType {
     MouseDownLeft,
     MouseDownMiddle,
@@ -28,6 +28,8 @@ pub enum SwiftEventType {
 
     WindowResized,
     WindowMoved,
+    WindowCloseRequested,
+    WindowDestroyed,
 
     KeyPressed,
     KeyReleased,
@@ -85,6 +87,7 @@ impl TryInto<Event> for SwiftEvent {
                 EventKind::Resized(self.data1 as u32, self.data2 as u32)
             }
             SwiftEventType::WindowMoved => EventKind::Moved(self.data1, self.data2),
+            SwiftEventType::WindowDestroyed => EventKind::Destroyed,
             _ => return Err(()),
         };
 

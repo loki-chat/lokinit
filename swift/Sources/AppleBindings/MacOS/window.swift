@@ -343,6 +343,12 @@ public class BSWindow: NSWindow {
         cursor.set()
         self.nonDefaultCursor = nonDefault
     }
+
+    // Pass the window destroyed event to Lokinit
+    public override func close() {
+        EventBuffer = LokEvent(.WindowDestroyed, UInt(self.windowNumber))
+        super.close()
+    }
 }
 
 #endif

@@ -3,6 +3,8 @@
 import Foundation
 import AppKit
 
+public var EventBuffer: LokEvent? = nil
+
 @_cdecl("setup")
 func ffiSetup() {
     // Init NSApplication
@@ -117,6 +119,11 @@ func ffiUpdate() -> LokEvent {
             }
         default:
             continue
+        }
+
+        if let buffer = EventBuffer {
+            EventBuffer = nil
+            return buffer
         }
     }
 }

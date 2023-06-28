@@ -19,6 +19,8 @@ typedef CF_ENUM(int, LokEventType) {
 
     WindowResized,
     WindowMoved,
+    WindowCloseRequested,
+    WindowDestroyed,
 
     KeyPressed,
     KeyReleased,
@@ -33,6 +35,7 @@ struct LokEvent {
     int data3;
     unsigned long window;
 };
+typedef struct LokEvent LokEvent;
 // Swift representation of the MouseButton and MouseEvent enums
 typedef CF_ENUM(int, MouseButton) {
     Left = 0,
@@ -46,5 +49,4 @@ typedef CF_ENUM(int, MouseEvent) {
 };
 
 // Rust FFI callbacks
-void rust_mouse_callback(int window, MouseButton btn, MouseEvent event, double x, double y);
-void rust_window_resize_callback(unsigned long window, unsigned int width, unsigned int height);
+void rust_queue_event(LokEvent event);
