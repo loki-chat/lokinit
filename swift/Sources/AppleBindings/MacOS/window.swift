@@ -36,11 +36,18 @@ public class BSWindow: NSWindow {
         width: 50,
         height: 50
     )
+    // Sizes used for detecting if the cursor is over a window border 
+    static let windowResizeCornerHitboxSize = 15.0
+    static let windowResizeCornerHitboxOffset = (windowResizeCornerHitboxSize + 1.0) / 2.0
+    static let windowResizeSideHitboxSize = 7.0
+    static let windowResizeSideHitboxOffset = (windowResizeSideHitboxSize + 1.0) / 2.0
     
     // Which part of the window is being resized right now, if it's being resized
     var resizeBorder: WindowBorderLocation? = nil
     // If the cursor is a non-default cursor
     var nonDefaultCursor = false
+    //  If the mouse was in the window (tracks mouse entered/left events)
+    var mouseWasInWindow = false
     
     init(_ size: NSRect, _ centered: Bool, _ title: String) {
         print("Making new window")
@@ -70,10 +77,7 @@ public class BSWindow: NSWindow {
     func leftButtonDownHandler(_ event: NSEvent) -> Bool {
         if !self.isMainWindow {
             // print("Making self main window due to click")
-            // Yes... we need all 3 of these just to make the window the main window :dawae:
-            self.makeKeyAndOrderFront(nil)
-            self.makeMain()
-            self.becomeMain()
+            self.focus()
         }
         
         if let border = self.checkMouseInBorder() {
@@ -185,6 +189,27 @@ public class BSWindow: NSWindow {
     // Mouse movement handler for windows
     // Returns true if the event was handled, false if it wasn't
     func mouseMovedHandler(_ event: NSEvent) -> Bool {
+        let mousePos = self.getMouseLocation()
+
+        // Check if the mouse entered or left the window
+        if self.checkMouseInWindow() && !self.mouseWasInWindow {
+            self.mouseWasInWindow = true
+            EventBuffer.append(LokEvent(
+                .MouseEntered,
+                Int32(mousePos.x),
+                Int32(mousePos.y),
+                UInt(self.windowNumber)
+            ))
+        } else if self.checkMouseOutsideWindow() && self.mouseWasInWindow {
+            self.mouseWasInWindow = false
+            EventBuffer.append(LokEvent(
+                .MouseExited,
+                Int32(mousePos.x),
+                Int32(mousePos.y),
+                UInt(self.windowNumber)
+            ))
+        }
+
         // Check if cursor is over one of the window borders
         let mouseInBorder = self.checkMouseInBorder()
         if let border = mouseInBorder {
@@ -204,7 +229,6 @@ public class BSWindow: NSWindow {
         }
         
         // Check if cursor is over one of the titlebar buttons
-        let mousePos = self.getMouseLocation()
         if BSWindow.titlebarButtonBox.contains(mousePos) {
             for btn in self.windowButtons() {
                 btn.isHighlighted = true
@@ -242,23 +266,34 @@ public class BSWindow: NSWindow {
     func getMouseLocation() -> NSPoint {
         return self.correctWindowPoint(self.mouseLocationOutsideOfEventStream)
     }
-    
+  
+    // Checks if the mouse is out of the window
+    func checkMouseOutsideWindow() -> Bool {
+        let window = CGRect(
+            x: -Self.windowResizeSideHitboxOffset,
+            y: -Self.windowResizeSideHitboxOffset,
+            width: self.frame.width + (Self.windowResizeSideHitboxOffset * 2),
+            height: self.frame.height + (Self.windowResizeSideHitboxOffset * 2)
+        )
+
+        return !window.contains(self.getMouseLocation())
+    }
+    // Checks if the mouse is in the window
+    func checkMouseInWindow() -> Bool {
+        let innerWindow = CGRect(
+            x: Self.windowResizeSideHitboxOffset,
+            y: Self.windowResizeSideHitboxOffset,
+            width: self.frame.width - (Self.windowResizeSideHitboxOffset * 2),
+            height: self.frame.height - (Self.windowResizeSideHitboxOffset * 2)
+        )
+
+        return innerWindow.contains(self.getMouseLocation())
+    }
     // Checks if the mouse is in any of the window borders
     func checkMouseInBorder() -> WindowBorderLocation? {
-        let cornerBoxSize = 15.0
-        let cornerBoxOffset = (cornerBoxSize + 1.0) / 2.0
-        let sideBoxSize = 7.0
-        let sideBoxOffset = (sideBoxSize + 1.0) / 2.0
-        let mouseLocationWindow = self.getMouseLocation()
-        let mouseLocationScreen = NSEvent.mouseLocation
+        let mouseLocation = NSEvent.mouseLocation
         
-        let innerWindow = CGRect(
-            x: sideBoxOffset,
-            y: sideBoxOffset,
-            width: self.frame.width - (sideBoxOffset * 2),
-            height: self.frame.height - (sideBoxOffset * 2)
-        )
-        if innerWindow.contains(mouseLocationWindow) {
+        if self.checkMouseInWindow() {
             return nil
         }
         
@@ -267,71 +302,71 @@ public class BSWindow: NSWindow {
         // Calculate boxes for the top, bottom, left, and right edges of the window
         let top = CGRect(
             x: self.frame.minX,
-            y: self.frame.maxY - sideBoxOffset,
+            y: self.frame.maxY - Self.windowResizeSideHitboxOffset,
             width: self.frame.width,
-            height: sideBoxSize
-        )
+            height: Self.windowResizeSideHitboxSize
+            )
         let bottom = CGRect(
             x: self.frame.minX,
-            y: self.frame.minY - sideBoxOffset,
+            y: self.frame.minY - Self.windowResizeSideHitboxOffset,
             width: self.frame.width,
-            height: sideBoxSize
+            height: Self.windowResizeSideHitboxSize
         )
         let left = CGRect(
-            x: self.frame.minX - sideBoxOffset,
+            x: self.frame.minX - Self.windowResizeSideHitboxOffset,
             y: self.frame.minY,
-            width: sideBoxSize,
+            width: Self.windowResizeSideHitboxSize,
             height: self.frame.height
         )
         let right = CGRect(
-            x: self.frame.maxX - sideBoxOffset,
+            x: self.frame.maxX - Self.windowResizeSideHitboxOffset,
             y: self.frame.minY,
-            width: sideBoxSize,
+            width: Self.windowResizeSideHitboxSize,
             height: self.frame.height
         )
         
         // Calculate boxes for the corners of the window
         let topLeft = CGRect(
-            x: self.frame.minX - cornerBoxOffset,
-            y: self.frame.maxY - cornerBoxOffset,
-            width: cornerBoxSize,
-            height: cornerBoxSize
+            x: self.frame.minX - Self.windowResizeCornerHitboxOffset,
+            y: self.frame.maxY - Self.windowResizeCornerHitboxOffset,
+            width: Self.windowResizeCornerHitboxSize,
+            height: Self.windowResizeCornerHitboxSize
         )
         let topRight = CGRect(
-            x: self.frame.maxX - cornerBoxOffset,
-            y: self.frame.maxY - cornerBoxOffset,
-            width: cornerBoxSize,
-            height: cornerBoxSize
+            x: self.frame.maxX - Self.windowResizeCornerHitboxOffset,
+            y: self.frame.maxY - Self.windowResizeCornerHitboxOffset,
+            width: Self.windowResizeCornerHitboxSize,
+            height: Self.windowResizeCornerHitboxSize
         )
         let bottomLeft = CGRect(
-            x: self.frame.minX - cornerBoxOffset,
-            y: self.frame.minY - cornerBoxOffset,
-            width: cornerBoxSize,
-            height: cornerBoxSize
+            x: self.frame.minX - Self.windowResizeCornerHitboxOffset,
+            y: self.frame.minY - Self.windowResizeCornerHitboxOffset,
+            width: Self.windowResizeCornerHitboxSize,
+            height: Self.windowResizeCornerHitboxSize
         )
         let bottomRight = CGRect(
-            x: self.frame.maxX - cornerBoxOffset,
-            y: self.frame.minY - cornerBoxOffset,
-            width: cornerBoxSize,
-            height: cornerBoxSize
+            x: self.frame.maxX - Self.windowResizeCornerHitboxOffset,
+            y: self.frame.minY - Self.windowResizeCornerHitboxOffset,
+            width: Self.windowResizeCornerHitboxSize,
+            height: Self.windowResizeCornerHitboxSize
         )
         
         // Return the border the mouse is on
-        if topLeft.contains(mouseLocationScreen) {
+        if topLeft.contains(mouseLocation) {
             return .TopLeft
-        } else if topRight.contains(mouseLocationScreen) {
+        } else if topRight.contains(mouseLocation) {
             return .TopRight
-        } else if bottomLeft.contains(mouseLocationScreen) {
+        } else if bottomLeft.contains(mouseLocation) {
             return .BottomLeft
-        } else if bottomRight.contains(mouseLocationScreen) {
+        } else if bottomRight.contains(mouseLocation) {
             return .BottomRight
-        } else if top.contains(mouseLocationScreen) {
+        } else if top.contains(mouseLocation) {
             return .Top
-        } else if bottom.contains(mouseLocationScreen) {
+        } else if bottom.contains(mouseLocation) {
             return .Bottom
-        } else if left.contains(mouseLocationScreen) {
+        } else if left.contains(mouseLocation) {
             return .Left
-        } else if right.contains(mouseLocationScreen) {
+        } else if right.contains(mouseLocation) {
             return .Right
         } else {
             return nil
@@ -346,8 +381,18 @@ public class BSWindow: NSWindow {
 
     // Pass the window destroyed event to Lokinit
     public override func close() {
-        EventBuffer = LokEvent(.WindowDestroyed, UInt(self.windowNumber))
+        EventBuffer.append(LokEvent(.WindowDestroyed, UInt(self.windowNumber)))
         super.close()
+    }
+
+    // Make the window the main window, and send focus events to Lokinit
+    public func focus() {
+        EventBuffer.append(LokEvent(.WindowLostFocus, UInt(NSApp.frontWindow.windowNumber)))
+        EventBuffer.append(LokEvent(.WindowGainedFocus, UInt(self.windowNumber)))
+        // Yes... we need all 3 of these just to make the window the main window :dawae:
+        self.makeKeyAndOrderFront(nil)
+        self.makeMain()
+        self.becomeMain()
     }
 }
 

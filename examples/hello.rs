@@ -63,6 +63,8 @@ fn main() {
             EventKind::Destroyed => {
                 println!("[{win:?}] Destroyed")
             }
+            EventKind::FocusIn => println!("[{win:?}] Window focused"),
+            EventKind::FocusOut => println!("[{win:?}] Window lost focus"),
             _ => {}
         }
     }

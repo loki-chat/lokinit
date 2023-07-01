@@ -3,7 +3,7 @@
 import Foundation
 import AppKit
 
-public var EventBuffer: LokEvent? = nil
+public var EventBuffer: Array<LokEvent> = Array()
 
 @_cdecl("setup")
 func ffiSetup() {
@@ -26,15 +26,20 @@ func ffiCreateWindow(x: Int, y: Int, width: Int, height: Int, centered: Bool, ti
 func ffiUpdate() -> LokEvent { 
     while true {
         if NSApp.windows.count == 0 {
-            print("Swift: quitting due to lack of windows")
             return LokEvent(.AppQuit, 0)
         }
+
+        if EventBuffer.first != nil {
+            return EventBuffer.removeFirst()
+        }
+
         let event = NSApp.nextEvent(
             matching: NSEvent.EventTypeMask.any,
             until: Date.distantFuture,
             inMode: RunLoop.Mode.default,
             dequeue: true
         )!
+
         switch event.type {
         case .appKitDefined:
             switch event.subtype {
@@ -119,11 +124,6 @@ func ffiUpdate() -> LokEvent {
             }
         default:
             continue
-        }
-
-        if let buffer = EventBuffer {
-            EventBuffer = nil
-            return buffer
         }
     }
 }

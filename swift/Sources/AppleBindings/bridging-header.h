@@ -21,6 +21,8 @@ typedef CF_ENUM(int, LokEventType) {
     WindowMoved,
     WindowCloseRequested,
     WindowDestroyed,
+    WindowGainedFocus,
+    WindowLostFocus,
 
     KeyPressed,
     KeyReleased,

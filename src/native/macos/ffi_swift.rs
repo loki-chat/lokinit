@@ -30,6 +30,8 @@ pub enum SwiftEventType {
     WindowMoved,
     WindowCloseRequested,
     WindowDestroyed,
+    WindowGainedFocus,
+    WindowLostFocus,
 
     KeyPressed,
     KeyReleased,
@@ -88,6 +90,14 @@ impl TryInto<Event> for SwiftEvent {
             }
             SwiftEventType::WindowMoved => EventKind::Moved(self.data1, self.data2),
             SwiftEventType::WindowDestroyed => EventKind::Destroyed,
+            SwiftEventType::MouseEntered => {
+                EventKind::Mouse(MouseEvent::CursorIn(self.data1, self.data2))
+            }
+            SwiftEventType::MouseExited => {
+                EventKind::Mouse(MouseEvent::CursorOut(self.data1, self.data2))
+            }
+            SwiftEventType::WindowGainedFocus => EventKind::FocusIn,
+            SwiftEventType::WindowLostFocus => EventKind::FocusOut,
             _ => return Err(()),
         };
 
