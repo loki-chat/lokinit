@@ -67,6 +67,16 @@ impl TryInto<Event> for SwiftEvent {
                 self.data1,
                 self.data2,
             )),
+            SwiftEventType::MouseUpMiddle => EventKind::Mouse(MouseEvent::ButtonRelease(
+                MouseButton::Middle,
+                self.data1,
+                self.data2,
+            )),
+            SwiftEventType::MouseDownMiddle => EventKind::Mouse(MouseEvent::ButtonPress(
+                MouseButton::Middle,
+                self.data1,
+                self.data2,
+            )),
             SwiftEventType::MouseUpRight => EventKind::Mouse(MouseEvent::ButtonRelease(
                 MouseButton::Right,
                 self.data1,

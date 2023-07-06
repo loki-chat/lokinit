@@ -106,15 +106,28 @@ func ffiUpdate() -> LokEvent {
         case .otherMouseDown:
             let window = event.window! as! BSWindow
             let mousePos = window.getMouseLocation()
-            return LokEvent(.MouseDownOther, Int32(mousePos.x), Int32(mousePos.y), Int32(event.buttonNumber), UInt(window.windowNumber))
+            let mouseBtn = event.buttonNumber
+
+            if mouseBtn == 2 {
+                return LokEvent(.MouseDownMiddle, Int32(mousePos.x), Int32(mousePos.y), UInt(window.windowNumber))
+            } else {
+                return LokEvent(.MouseDownOther, Int32(mousePos.x), Int32(mousePos.y), Int32(mouseBtn), UInt(window.windowNumber))
+            }
         case .otherMouseDragged:
             let window = event.window! as! BSWindow
             let mousePos = window.getMouseLocation()
+
             return LokEvent(.MouseMoved, Int32(mousePos.x), Int32(mousePos.y), UInt(window.windowNumber))
         case .otherMouseUp:
             let window = event.window! as! BSWindow
             let mousePos = window.getMouseLocation()
-            return LokEvent(.MouseUpOther, Int32(mousePos.x), Int32(mousePos.y), Int32(event.buttonNumber), UInt(window.windowNumber))
+            let mouseBtn = event.buttonNumber
+
+            if mouseBtn == 2 {
+                return LokEvent(.MouseUpMiddle, Int32(mousePos.x), Int32(mousePos.y), UInt(window.windowNumber))
+            } else {
+                return LokEvent(.MouseUpOther, Int32(mousePos.x), Int32(mousePos.y), Int32(event.buttonNumber), UInt(window.windowNumber))
+            }
         case .mouseMoved:
             let window = NSApp.frontWindow as! BSWindow
             let handled = window.mouseMovedHandler(event)
