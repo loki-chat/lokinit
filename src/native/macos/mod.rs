@@ -2,6 +2,7 @@ use crate::lok::{CreateWindowError, LokinitBackend};
 
 mod ffi_rust;
 mod ffi_swift;
+mod keysym;
 
 use {
     crate::{

@@ -1,8 +1,9 @@
 //! Bindings to the external Swift code
 
 use {
+    super::keysym,
     crate::{
-        event::{Event, EventKind, MouseButton, MouseEvent},
+        event::{Event, EventKind, KeyboardEvent, MouseButton, MouseEvent},
         window::WindowHandle,
     },
     std::{ffi::c_char, time::Duration},
@@ -108,6 +109,24 @@ impl TryInto<Event> for SwiftEvent {
             }
             SwiftEventType::WindowGainedFocus => EventKind::FocusIn,
             SwiftEventType::WindowLostFocus => EventKind::FocusOut,
+            SwiftEventType::KeyPressed => {
+                match keysym::to_keycode(self.data1.try_into().unwrap()) {
+                    None => return Err(()),
+                    Some(key) => EventKind::Keyboard(KeyboardEvent::KeyPress(key)),
+                }
+            }
+            SwiftEventType::KeyRepeated => {
+                match keysym::to_keycode(self.data1.try_into().unwrap()) {
+                    None => return Err(()),
+                    Some(key) => EventKind::Keyboard(KeyboardEvent::KeyRepeat(key)),
+                }
+            }
+            SwiftEventType::KeyReleased => {
+                match keysym::to_keycode(self.data1.try_into().unwrap()) {
+                    None => return Err(()),
+                    Some(key) => EventKind::Keyboard(KeyboardEvent::KeyRelease(key)),
+                }
+            }
             _ => return Err(()),
         };
 

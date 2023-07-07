@@ -4,6 +4,7 @@ import Foundation
 import AppKit
 
 public var EventBuffer: Array<LokEvent> = Array()
+var LastKeySym: Int32? = nil
 
 @_cdecl("setup")
 func ffiSetup() {
@@ -135,6 +136,23 @@ func ffiUpdate() -> LokEvent {
                 let mousePos = window.getMouseLocation()
                 return LokEvent(.MouseMoved, Int32(mousePos.x), Int32(mousePos.y), UInt(window.windowNumber))
             }
+        case .keyDown:
+            let keySym = Int32(event.keyCode)
+
+            if keySym == LastKeySym {
+                return LokEvent(.KeyRepeated, keySym, UInt(event.windowNumber))
+            } else {
+                LastKeySym = keySym
+                return LokEvent(.KeyPressed, keySym, UInt(event.windowNumber))
+            }
+        case .keyUp:
+            let keySym = Int32(event.keyCode)
+
+            if keySym == LastKeySym {
+                LastKeySym = nil
+            }
+
+            return LokEvent(.KeyReleased, keySym, UInt(event.windowNumber))
         default:
             continue
         }
