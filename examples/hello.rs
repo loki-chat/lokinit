@@ -65,4 +65,5 @@ fn main() {
     }
 
     println!("Event loop ended, quitting!");
+
 }

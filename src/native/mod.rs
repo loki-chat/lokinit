@@ -28,4 +28,4 @@ pub type DefaultLokinitBackend = linux::LinuxBackend;
 pub type DefaultLokinitBackend = macos::MacosBackend;
 
 #[cfg(target_os = "windows")]
-pub use windows;
+pub type DefaultLokinitBackend = windows::WindowsBackend;
