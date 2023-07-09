@@ -1,20 +1,20 @@
-use crate::{lok::LokinitBackend, prelude::WindowHandle, window::ScreenMode, event::Event};
+use std::time::Duration;
+
+use crate::{
+    event::{Event, EventKind},
+    lok::{CreateWindowError, LokinitBackend, Monitor},
+    window::{ScreenMode, WindowBuilder, WindowHandle},
+};
 
 use winapi::{
     shared::{
-        hidusage::{HID_USAGE_GENERIC_MOUSE, HID_USAGE_PAGE_GENERIC},
-        minwindef::{DWORD, HIWORD, LOWORD, LPARAM, LRESULT, UINT, WPARAM},
+        minwindef::{DWORD, LPARAM, LRESULT, UINT, WPARAM},
         ntdef::NULL,
-        windef::{HCURSOR, HDC, HICON, HWND, POINT, RECT},
-        windowsx::{GET_X_LPARAM, GET_Y_LPARAM},
+        windef::{HWND, RECT},
     },
-    um::{
-        libloaderapi::{GetModuleHandleW, GetProcAddress},
-        shellscalingapi::*,
-        wingdi::*,
-        winuser::*,
-    },
+    um::{libloaderapi::GetModuleHandleW, winuser::*},
 };
+
 #[derive(Default)]
 pub struct WindowsBackend {
     pub window_handles: Vec<WindowHandle>,
@@ -25,7 +25,7 @@ impl LokinitBackend for WindowsBackend {
         Self::default()
     }
 
-    fn create_window(&mut self, builder: crate::prelude::WindowBuilder) -> Result<crate::prelude::WindowHandle, crate::lok::CreateWindowError> {
+    fn create_window(&mut self, builder: WindowBuilder) -> Result<WindowHandle, CreateWindowError> {
         let class_name = "LOKINIT\0".encode_utf16().collect::<Vec<u16>>();
         let mut window_name = builder.title.encode_utf16().collect::<Vec<u16>>();
         window_name.push(0);
@@ -36,7 +36,7 @@ impl LokinitBackend for WindowsBackend {
             window_class.hInstance = GetModuleHandleW(NULL as _);
             window_class.lpszClassName = class_name.as_ptr() as _;
             window_class.lpfnWndProc = Some(win32_wndproc);
-            window_class.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+            window_class.style = CS_HREDRAW | CS_VREDRAW;
             RegisterClassW(&window_class);
 
             let win_style: DWORD;
@@ -69,20 +69,19 @@ impl LokinitBackend for WindowsBackend {
 
                 rect.right = builder.size.width as i32 + builder.position.x;
                 rect.bottom = builder.size.height as i32 + builder.position.y;
-
             }
-            
+
             AdjustWindowRectEx(&rect as *const _ as _, win_style, false as _, win_ex_style);
             let win_width = rect.right - rect.left;
             let win_height = rect.bottom - rect.top;
-            
-            let window_handle = CreateWindowExW(
+
+            let hwnd = CreateWindowExW(
                 win_ex_style,                // dwExStyle
                 class_name.as_ptr(),         // lpClassName
                 window_name.as_ptr(),        // lpWindowName
                 win_style,                   // dwStyle
-                builder.position.x,               // X
-                builder.position.y,               // Y
+                builder.position.x,          // X
+                builder.position.y,          // Y
                 win_width,                   // nWidth
                 win_height,                  // nHeight
                 NULL as _,                   // hWndParent
@@ -91,38 +90,48 @@ impl LokinitBackend for WindowsBackend {
                 NULL as _,                   // lparam
             );
 
-            ShowWindow(window_handle, SW_SHOW);
-            self.window_handles.push(WindowHandle(window_handle as usize));
-            Ok(WindowHandle(window_handle as usize))
+            ShowWindow(hwnd, SW_SHOW);
+            let window_handle = WindowHandle(hwnd as usize);
+            self.window_handles.push(window_handle);
+            Ok(window_handle)
         }
     }
 
-    fn poll_event(&mut self) -> Option<crate::event::Event> {
+    fn poll_event(&mut self) -> Option<Event> {
         unsafe {
             let mut msg: MSG = std::mem::zeroed();
-            GetMessageW(&mut msg as *mut MSG, NULL as _, 0, 0);
+            GetMessageW(&mut msg, NULL as _, 0, 0);
+
             match msg.message {
-                0x0f => {}
-                0xa0 => {}
-                0xa1 => {}
-                WM_SIZING => println!("Something happened!"),
-                WM_SIZE => println!("Something else happened!"),
-                _ =>    println!("{:x}", msg.message)
+                WM_PAINT => {}
+                WM_NCMOUSEMOVE => {}
+                WM_NCLBUTTONDOWN => {}
+                LOKI_WM_SIZE => println!("Something good happened!"),
+                LOKI_WM_MOVE => println!("Something moved!"),
+                _ => println!("message: {:x}", msg.message),
             }
+
             TranslateMessage(&msg);
-            Some(Event { time: std::time::Duration::from_millis(1), window: WindowHandle(msg.hwnd as usize), kind: crate::event::EventKind::Redraw })
+            DispatchMessageW(&msg);
+            Some(Event {
+                time: Duration::from_millis(1),
+                window: WindowHandle(msg.hwnd as usize),
+                kind: EventKind::Redraw,
+            })
         }
-        
     }
 
-    fn close_window(&mut self, handle: crate::prelude::WindowHandle) {
+    fn close_window(&mut self, handle: WindowHandle) {
         todo!()
     }
 
-    fn fetch_monitors(&mut self) -> Vec<crate::prelude::Monitor> {
-       todo!() 
+    fn fetch_monitors(&mut self) -> Vec<Monitor> {
+        todo!()
     }
 }
+
+const LOKI_WM_SIZE: UINT = WM_APP + 0x01;
+const LOKI_WM_MOVE: UINT = WM_APP + 0x02;
 
 unsafe extern "system" fn win32_wndproc(
     hwnd: HWND,
@@ -130,10 +139,17 @@ unsafe extern "system" fn win32_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    match umsg {
-        WM_SIZING => println!("resize in the window proc"),
-        WM_SIZE => println! ("other resize in the window proc"),
-        _ => {}
+    // Send a corresponding custom event when GetMessageW doesn't retrieve it itself
+    let success = match umsg {
+        WM_SIZE => PostMessageW(hwnd, LOKI_WM_SIZE, wparam, lparam) != 0,
+        WM_MOVE => PostMessageW(hwnd, LOKI_WM_MOVE, wparam, lparam) != 0,
+        _ => true,
+    };
+
+    if !success {
+        // TODO: call GetLastError... maybe...
+        eprintln!("Error (call GetLastError)?");
     }
-    return DefWindowProcW(hwnd, umsg, wparam, lparam);
+
+    DefWindowProcW(hwnd, umsg, wparam, lparam)
 }
