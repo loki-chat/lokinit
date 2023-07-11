@@ -1,4 +1,8 @@
-use std::time::Duration;
+use std::{
+    cell::RefCell,
+    collections::{BTreeSet, VecDeque},
+    time::Duration,
+};
 
 use crate::{
     event::{Event, EventKind},
@@ -17,7 +21,7 @@ use winapi::{
 
 #[derive(Default)]
 pub struct WindowsBackend {
-    pub window_handles: Vec<WindowHandle>,
+    window_handles: BTreeSet<WindowHandle>,
 }
 
 impl LokinitBackend for WindowsBackend {
@@ -92,37 +96,53 @@ impl LokinitBackend for WindowsBackend {
 
             ShowWindow(hwnd, SW_SHOW);
             let window_handle = WindowHandle(hwnd as usize);
-            self.window_handles.push(window_handle);
+            self.window_handles.insert(window_handle);
             Ok(window_handle)
         }
     }
 
     fn poll_event(&mut self) -> Option<Event> {
-        unsafe {
-            let mut msg: MSG = std::mem::zeroed();
-            GetMessageW(&mut msg, NULL as _, 0, 0);
-
-            match msg.message {
-                WM_PAINT => {}
-                WM_NCMOUSEMOVE => {}
-                WM_NCLBUTTONDOWN => {}
-                LOKI_WM_SIZE => println!("Something good happened!"),
-                LOKI_WM_MOVE => println!("Something moved!"),
-                _ => println!("message: {:x}", msg.message),
+        loop {
+            let n_events = n_events();
+            if n_events != 0 {
+                // println!("Events in poll_event: {}", n_events);
+            }
+            if let Some(event) = recv_event() {
+                return Some(event);
             }
 
-            TranslateMessage(&msg);
-            DispatchMessageW(&msg);
-            Some(Event {
-                time: Duration::from_millis(1),
-                window: WindowHandle(msg.hwnd as usize),
-                kind: EventKind::Redraw,
-            })
+            unsafe {
+                let mut msg: MSG = std::mem::zeroed();
+                if PeekMessageW(&mut msg, NULL as _, 0, 0, PM_REMOVE) != 0 {
+                    let window = WindowHandle(msg.hwnd as usize);
+                    println!("peeking message");
+
+                    if WM_QUIT == msg.message {
+                        println!("quitting");
+                        return Some(Event {
+                            time: Duration::from_millis(1),
+                            window,
+                            kind: EventKind::CloseRequested,
+                        });
+                    } else {
+                        TranslateMessage(&mut msg as *mut _ as _);
+                        DispatchMessageW(&mut msg as *mut _ as _);
+                    }
+                }
+            }
+
+            // println!("Remaining windows: {}", self.window_handles.len());
+            if self.window_handles.is_empty() {
+                // We quit once all windows have quit
+                return None;
+            }
         }
     }
 
     fn close_window(&mut self, handle: WindowHandle) {
-        todo!()
+        self.window_handles.remove(&handle);
+        println!("Remaining windows: {}", self.window_handles.len());
+        unsafe { DestroyWindow(handle.0 as _) };
     }
 
     fn fetch_monitors(&mut self) -> Vec<Monitor> {
@@ -130,8 +150,23 @@ impl LokinitBackend for WindowsBackend {
     }
 }
 
-const LOKI_WM_SIZE: UINT = WM_APP + 0x01;
-const LOKI_WM_MOVE: UINT = WM_APP + 0x02;
+thread_local! {
+    // The event queue! Because Windows is stupid and blocks on some important events
+    // (like resizing and moving) because it handles them with internal loops. -_-
+    static EVENT_QUEUE: RefCell<VecDeque<Event>> = RefCell::new(VecDeque::new());
+}
+
+fn n_events() -> usize {
+    EVENT_QUEUE.with(|event_queue| event_queue.borrow().len())
+}
+
+fn send_event(event: Event) {
+    EVENT_QUEUE.with(move |event_queue| event_queue.borrow_mut().push_back(event))
+}
+
+fn recv_event() -> Option<Event> {
+    EVENT_QUEUE.with(|event_queue| event_queue.borrow_mut().pop_front())
+}
 
 unsafe extern "system" fn win32_wndproc(
     hwnd: HWND,
@@ -139,17 +174,40 @@ unsafe extern "system" fn win32_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    // Send a corresponding custom event when GetMessageW doesn't retrieve it itself
-    let success = match umsg {
-        WM_SIZE => PostMessageW(hwnd, LOKI_WM_SIZE, wparam, lparam) != 0,
-        WM_MOVE => PostMessageW(hwnd, LOKI_WM_MOVE, wparam, lparam) != 0,
-        _ => true,
-    };
-
-    if !success {
-        // TODO: call GetLastError... maybe...
-        eprintln!("Error (call GetLastError)?");
+    let time = Duration::from_millis(1);
+    let window = WindowHandle(hwnd as usize);
+    match umsg {
+        WM_SIZE => {
+            let width = ((lparam >> (isize::BITS / 2)) & 0xffff) as u32;
+            let height = (lparam & 0xffff) as u32;
+            send_event(Event {
+                time,
+                window,
+                kind: EventKind::Resized(width, height),
+            });
+        }
+        WM_MOVE => {
+            let x: i32 = std::mem::transmute(((lparam >> (isize::BITS / 2)) & 0xffff) as u32);
+            let y: i32 = std::mem::transmute((lparam & 0xffff) as u32);
+            send_event(Event {
+                time,
+                window,
+                kind: EventKind::Moved(x, y),
+            });
+        }
+        WM_QUIT => {
+            PostMessageW(hwnd, WM_CLOSE, 0, 0);
+        }
+        WM_CLOSE => {
+            println!("closing from wndproc");
+        }
+        _ => send_event(Event {
+            time,
+            window,
+            kind: EventKind::Redraw,
+        }),
     }
+    println!("Events in wndproc: {}", n_events());
 
     DefWindowProcW(hwnd, umsg, wparam, lparam)
 }
