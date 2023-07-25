@@ -1,4 +1,4 @@
-#![allow(non_snake_case)]
+#![allow(non_snake_case, clippy::upper_case_acronyms)]
 
 use std::ffi::{c_char, c_int, c_long, c_short, c_uint, c_ulong, c_void};
 
@@ -35,7 +35,7 @@ impl XWindow {
         self.0
     }
 
-    pub unsafe fn into_window_handle(&self) -> WindowHandle {
+    pub unsafe fn into_window_handle(self) -> WindowHandle {
         WindowHandle(self.0 as usize)
     }
 }
