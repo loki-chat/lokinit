@@ -1,4 +1,5 @@
 use std::ffi::{c_void, CString};
+use std::fmt;
 use std::ptr::NonNull;
 use std::rc::Rc;
 
@@ -57,14 +58,29 @@ pub enum LoadingError {
     Symbol(Rc<str>),
 }
 
+impl std::error::Error for LoadingError {}
+
+impl fmt::Display for LoadingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Library(err) => write!(f, "Library loading error: {}", err),
+            Self::Symbol(err) => write!(f, "Symbol loading error: {}", err),
+        }
+    }
+}
+
 /// Generates a library struct that loads all the specified functions from the library at runtime.
 #[macro_export]
 macro_rules! library {
     (
         [ $lib:ident <-> $name:literal ] ;
+
+        $( { $( $sym_name:ident : $sym_type:ty );* ; } )?
+
         $( pub fn $fn:ident $args:tt $(-> $res:ty)? );* ;
     ) => {
         pub struct $lib {
+            $($(pub $sym_name: $sym_type,)*)?
             $(pub $fn: unsafe extern "C" fn$args$( -> $res)?,)*
         }
 
@@ -74,6 +90,7 @@ macro_rules! library {
                     .map_err($crate::native::linux::LoadingError::Library)?;
 
                 Ok(Self {
+                    $($($sym_name: lib.get_sym(stringify!($sym_name)).map_err($crate::native::linux::LoadingError::Symbol)?,)*)?
                     $($fn: lib.get_sym(stringify!($fn)).map_err($crate::native::linux::LoadingError::Symbol)?,)*
                 })
             }
@@ -92,22 +109,16 @@ impl LokinitBackend for LinuxBackend {
         Self: Sized + 'static,
     {
         match std::env::var("LOKINIT_BACKEND") {
-            Ok(x) if x == "wayland" => {
-                Self::Wayland(WaylandBackend::init().unwrap())
-            }
-            Ok(x) if x == "xlib" => {
-                Self::X11(X11Backend::init().unwrap())
-            }
+            Ok(x) if x == "wayland" => Self::Wayland(WaylandBackend::init().unwrap()),
+            Ok(x) if x == "xlib" => Self::X11(X11Backend::init().unwrap()),
 
-            Err(_) | Ok(_) => {
-                match WaylandBackend::init() {
-                    Ok(x) => Self::Wayland(x),
-                    Err(why) => {
-                        eprintln!("Failed to initialize wayland backend: {why:?}");
-                        Self::X11(X11Backend::init().unwrap())
-                    }
+            _ => match WaylandBackend::init() {
+                Ok(x) => Self::Wayland(x),
+                Err(why) => {
+                    eprintln!("Failed to initialize wayland backend: {why:?}");
+                    Self::X11(X11Backend::init().unwrap())
                 }
-            }
+            },
         }
     }
 

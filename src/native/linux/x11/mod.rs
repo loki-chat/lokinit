@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, VecDeque};
 use std::ffi::{c_int, c_void, CString};
+use std::fmt;
 use std::ptr::{null, null_mut, NonNull};
 use std::time::{Duration, Instant, SystemTime};
 
@@ -34,6 +35,18 @@ pub enum X11NativeCoreError {
 impl From<LoadingError> for X11NativeCoreError {
     fn from(value: LoadingError) -> Self {
         Self::LibLoading(value)
+    }
+}
+
+impl std::error::Error for X11NativeCoreError {}
+
+impl fmt::Display for X11NativeCoreError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LibLoading(load_err) => write!(f, "X11 {}", load_err),
+            Self::CannotOpenDisplay => write!(f, "X11 error: cannot open display"),
+            Self::CannotOpenInputMethod => write!(f, "X11 error: cannot open input method"),
+        }
     }
 }
 
