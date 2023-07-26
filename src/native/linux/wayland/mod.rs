@@ -26,7 +26,9 @@ impl fmt::Display for WaylandInitError {
             Self::NoLibWayland(err) => write!(f, "Cannot find libwayland-client: {:?}", err),
             Self::NoDisplaySet => write!(f, "WAYLAND_DISPLAY environment variable is not set"),
             Self::InvalidDisplayFormat => write!(f, "WAYLAND_DISPLAY is not a valid C string"),
-            Self::CannotOpenDisplay(display) => write!(f, "Cannot find Wayland display: {:?}", display),
+            Self::CannotOpenDisplay(display) => {
+                write!(f, "Cannot find Wayland display: {:?}", display)
+            }
         }
     }
 }
@@ -85,14 +87,14 @@ impl Drop for WaylandBackend {
 
 pub struct RegistryState {
     pub wl: Rc<LibWaylandClient>,
-    pub compositor: Option<NonNull<WlCompositor>>,
+    pub compositor: *mut WlCompositor,
 }
 
 impl RegistryState {
     fn new(wl: Rc<LibWaylandClient>) -> Self {
         Self {
             wl,
-            compositor: None,
+            compositor: std::ptr::null_mut(),
         }
     }
 }
@@ -101,7 +103,7 @@ unsafe extern "C" fn global_registry_handler(
     data: *mut RegistryState,
     registry: *mut WlRegistry,
     id: u32,
-    interface: *const c_char,
+    interface_name: *const c_char,
     version: u32,
 ) {
     let Some(data) = data.as_mut() else {
@@ -109,10 +111,10 @@ unsafe extern "C" fn global_registry_handler(
         return;
     };
 
-    let interface = CStr::from_ptr(interface).to_str().unwrap().to_owned();
-    if interface == "wl_compositor" {
-        let compositor = data.wl.wl_registry_bind(registry, id, data.wl.wl_registry_interface, version) as _;
-        data.compositor = NonNull::new(compositor);
+    let interface_name = CStr::from_ptr(interface_name).to_str().unwrap().to_owned();
+    if interface_name == "wl_compositor" {
+        let interface = data.wl.wl_registry_interface;
+        data.compositor = data.wl.wl_registry_bind(registry, id, interface, version) as _;
     }
 }
 
