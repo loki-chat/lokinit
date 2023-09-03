@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 use std::collections::{HashMap, VecDeque};
-use std::ffi::{c_int, c_void, CString};
+use std::ffi::{c_int, c_long, c_void, CString};
 use std::ptr::{null, null_mut, NonNull};
 use std::time::Duration;
 
@@ -14,7 +14,7 @@ use crate::prelude::{WindowBuilder, WindowHandle, WindowPos, WindowSize};
 use crate::window::ScreenMode;
 
 use self::ffi::{
-    et, xclass, xcw, xevent_mask, xim, xn, Status, XClientMessageData, XClientMessageEvent,
+    et, xclass, xcw, xevent_mask, xim, xn, Atom, Status, XClientMessageData, XClientMessageEvent,
     XDisplay, XErrorEvent, XKeyEvent, XPoint, XSetWindowAttributes, XWindow, XID,
     X_BUFFER_OVERFLOW, _XIC, _XIM,
 };
@@ -256,55 +256,30 @@ impl X11Backend {
     }
 
     pub fn set_screen_mode(&mut self, window: WindowHandle, screen_mode: ScreenMode) {
+        // TODO: what really is the difference between borderless and fullscreen on X11?
+        // What about bypassing the compositor as well?
+
         match screen_mode {
-            ScreenMode::Windowed => todo!(),
-            ScreenMode::Borderless => todo!(),
+            ScreenMode::Windowed => {
+                self.send_wm_state_client_message(
+                    window,
+                    WmStateAction::Remove,
+                    b"_NET_WM_STATE_FULLSCREEN\0",
+                );
+            }
+            ScreenMode::Borderless => {
+                self.send_wm_state_client_message(
+                    window,
+                    WmStateAction::Add,
+                    b"_NET_WM_STATE_FULLSCREEN\0",
+                );
+            }
             ScreenMode::Fullscreen => {
-                let wm_state = unsafe {
-                    (self.x11.XInternAtom)(
-                        self.display.as_ptr(),
-                        b"_NET_WM_STATE\0" as *const u8 as *const _,
-                        false as _,
-                    )
-                };
-                let wm_fullscreen = unsafe {
-                    (self.x11.XInternAtom)(
-                        self.display.as_ptr(),
-                        b"_NET_WM_STATE_FULLSCREEN\0" as *const u8 as *const _,
-                        false as _,
-                    )
-                };
-
-                let mut data = [0_isize; 5];
-
-                data[0] = 1;
-                data[1] = wm_fullscreen as isize;
-                data[2] = 0;
-
-                let mut event = XEvent {
-                    xclient: XClientMessageEvent {
-                        type_id: et::CLIENT_MESSAGE,
-                        serial: 0,
-                        send_event: true as _,
-                        message_type: wm_state,
-                        window: window.into(),
-                        display: self.display.as_ptr(),
-                        format: 32,
-                        data: XClientMessageData {
-                            l: unsafe { std::mem::transmute(data) },
-                        },
-                    },
-                };
-
-                unsafe {
-                    (self.x11.XSendEvent)(
-                        self.display.as_ptr(),
-                        self.root,
-                        false as _,
-                        xevent_mask::SUBSTRUCTURE_REDIRECT | xevent_mask::STRUCTURE_NOTIFY,
-                        &mut event as *mut _,
-                    );
-                }
+                self.send_wm_state_client_message(
+                    window,
+                    WmStateAction::Add,
+                    b"_NET_WM_STATE_FULLSCREEN\0",
+                );
             }
         }
     }
@@ -318,9 +293,62 @@ impl X11Backend {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+enum WmStateAction {
+    Remove = 0,
+    Add = 1,
+    Toggle = 2,
+}
+
 impl X11Backend {
     fn get_window(&self, window: WindowHandle) -> &X11NativeWindow {
         self.windows.get(&window).unwrap()
+    }
+
+    unsafe fn intern_atom(&self, name: &[u8]) -> Atom {
+        (self.x11.XInternAtom)(self.display.as_ptr(), name.as_ptr() as *const _, false as _)
+    }
+
+    /// Send a client message to tell X to change the state of the window.
+    fn send_wm_state_client_message(
+        &self,
+        window: WindowHandle,
+        action: WmStateAction,
+        prop: &[u8],
+    ) {
+        let wm_state = unsafe { self.intern_atom(b"_NET_WM_STATE\0") };
+        let wm_prop = unsafe { self.intern_atom(prop) };
+
+        let action = match action {
+            WmStateAction::Remove => 0,
+            WmStateAction::Add => 1,
+            WmStateAction::Toggle => 2,
+        };
+
+        let mut event = XEvent {
+            xclient: XClientMessageEvent {
+                type_id: et::CLIENT_MESSAGE,
+                serial: 0,
+                send_event: true as _,
+                message_type: wm_state,
+                window: window.into(),
+                display: self.display.as_ptr(),
+                format: 32,
+                data: XClientMessageData {
+                    l: [action, wm_prop as c_long, 0, 0, 0],
+                },
+            },
+        };
+
+        unsafe {
+            (self.x11.XSendEvent)(
+                self.display.as_ptr(),
+                self.root,
+                false as _,
+                xevent_mask::SUBSTRUCTURE_REDIRECT | xevent_mask::STRUCTURE_NOTIFY,
+                &mut event as *mut _,
+            );
+        }
     }
 
     /// Transform an `XEvent` into one or more Lokinit `Event`s and push them into the event queue.
