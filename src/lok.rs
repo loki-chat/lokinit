@@ -4,7 +4,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::native::DefaultLokinitBackend;
+use crate::{native::DefaultLokinitBackend, window::ScreenMode};
 
 use {
     crate::{
@@ -37,6 +37,8 @@ pub trait LokinitBackend {
     fn close_window(&mut self, handle: WindowHandle);
 
     fn poll_event(&mut self) -> Option<Event>;
+
+    fn set_screen_mode(&mut self, handle: WindowHandle, screen_mode: ScreenMode);
 
     // TODO: implement monitor fetching in native backends
     fn fetch_monitors(&mut self) -> Vec<Monitor> {
@@ -88,6 +90,10 @@ pub fn close_window(handle: WindowHandle) {
 
 pub fn poll_event() -> Option<Event> {
     with(|instance| instance.poll_event())
+}
+
+pub fn set_screen_mode(handle: WindowHandle, screen_mode: ScreenMode) {
+    with(|instance| instance.set_screen_mode(handle, screen_mode))
 }
 
 pub fn fetch_monitors() -> Vec<Monitor> {

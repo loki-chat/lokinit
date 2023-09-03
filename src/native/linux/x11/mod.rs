@@ -11,10 +11,12 @@ use crate::keycode::KeyCode;
 use crate::lok::CreateWindowError;
 use crate::native::linux::x11::ffi::{LibX11, XEvent};
 use crate::prelude::{WindowBuilder, WindowHandle, WindowPos, WindowSize};
+use crate::window::ScreenMode;
 
 use self::ffi::{
-    et, xclass, xcw, xevent_mask, xim, xn, Status, XDisplay, XErrorEvent,
-    XKeyEvent, XPoint, XSetWindowAttributes, XWindow, XID, X_BUFFER_OVERFLOW, _XIC, _XIM,
+    et, xclass, xcw, xevent_mask, xim, xn, Status, XClientMessageData, XClientMessageEvent,
+    XDisplay, XErrorEvent, XKeyEvent, XPoint, XSetWindowAttributes, XWindow, XID,
+    X_BUFFER_OVERFLOW, _XIC, _XIM,
 };
 
 use super::locale::{setlocale, LC_CTYPE};
@@ -33,6 +35,18 @@ pub enum X11NativeCoreError {
 impl From<LoadingError> for X11NativeCoreError {
     fn from(value: LoadingError) -> Self {
         Self::LibLoading(value)
+    }
+}
+
+impl From<XWindow> for WindowHandle {
+    fn from(value: XWindow) -> Self {
+        Self(value.0 as usize)
+    }
+}
+
+impl From<WindowHandle> for XWindow {
+    fn from(val: WindowHandle) -> Self {
+        XWindow(val.0 as u64)
     }
 }
 
@@ -241,6 +255,74 @@ impl X11Backend {
         }
     }
 
+    pub fn set_screen_mode(&mut self, window: WindowHandle, screen_mode: ScreenMode) {
+        match screen_mode {
+            ScreenMode::Windowed => todo!(),
+            ScreenMode::Borderless => todo!(),
+            ScreenMode::Fullscreen => {
+                let wm_state = unsafe {
+                    (self.x11.XInternAtom)(
+                        self.display.as_ptr(),
+                        b"_NET_WM_STATE\0" as *const u8 as *const _,
+                        false as _,
+                    )
+                };
+                let wm_fullscreen = unsafe {
+                    (self.x11.XInternAtom)(
+                        self.display.as_ptr(),
+                        b"_NET_WM_STATE_FULLSCREEN\0" as *const u8 as *const _,
+                        false as _,
+                    )
+                };
+
+                let mut data = [0_isize; 5];
+
+                data[0] = 1;
+                data[1] = wm_fullscreen as isize;
+                data[2] = 0;
+
+                let mut event = XEvent {
+                    xclient: XClientMessageEvent {
+                        type_id: et::CLIENT_MESSAGE,
+                        serial: 0,
+                        send_event: true as _,
+                        message_type: wm_state,
+                        window: window.into(),
+                        display: self.display.as_ptr(),
+                        format: 32,
+                        data: XClientMessageData {
+                            l: unsafe { std::mem::transmute(data) },
+                        },
+                    },
+                };
+
+                unsafe {
+                    (self.x11.XSendEvent)(
+                        self.display.as_ptr(),
+                        self.root,
+                        false as _,
+                        xevent_mask::SUBSTRUCTURE_REDIRECT | xevent_mask::STRUCTURE_NOTIFY,
+                        &mut event as *mut _,
+                    );
+                }
+            }
+        }
+    }
+
+    pub fn window_pos(&self, window: WindowHandle) -> WindowPos {
+        self.get_window(window).position
+    }
+
+    pub fn window_size(&self, window: WindowHandle) -> WindowSize {
+        self.get_window(window).size
+    }
+}
+
+impl X11Backend {
+    fn get_window(&self, window: WindowHandle) -> &X11NativeWindow {
+        self.windows.get(&window).unwrap()
+    }
+
     /// Transform an `XEvent` into one or more Lokinit `Event`s and push them into the event queue.
     /// Returns `Some(())` if the window emitting the event exists, `None` otherwise.
     ///
@@ -421,18 +503,6 @@ impl X11Backend {
         }
 
         Some(())
-    }
-
-    fn get_window(&self, window: WindowHandle) -> &X11NativeWindow {
-        self.windows.get(&window).unwrap()
-    }
-
-    pub fn window_pos(&self, window: WindowHandle) -> WindowPos {
-        self.get_window(window).position
-    }
-
-    pub fn window_size(&self, window: WindowHandle) -> WindowSize {
-        self.get_window(window).size
     }
 }
 
