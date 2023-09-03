@@ -1,20 +1,19 @@
 #![allow(unused)]
 
 use std::borrow::Cow;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::ffi::{c_int, c_void, CString};
 use std::ptr::{null, null_mut, NonNull};
-use std::time::{Duration, Instant, SystemTime};
+use std::time::Duration;
 
 use crate::event::{Event, EventKind, KeyboardEvent, MouseButton, MouseEvent};
 use crate::keycode::KeyCode;
-use crate::library;
 use crate::lok::CreateWindowError;
 use crate::native::linux::x11::ffi::{LibX11, XEvent};
 use crate::prelude::{WindowBuilder, WindowHandle, WindowPos, WindowSize};
 
 use self::ffi::{
-    et, xclass, xcw, xevent_mask, xim, xn, Status, XConfigureEvent, XDisplay, XErrorEvent,
+    et, xclass, xcw, xevent_mask, xim, xn, Status, XDisplay, XErrorEvent,
     XKeyEvent, XPoint, XSetWindowAttributes, XWindow, XID, X_BUFFER_OVERFLOW, _XIC, _XIM,
 };
 
@@ -50,10 +49,9 @@ pub struct X11Backend {
     root: XWindow,
     xim: NonNull<_XIM>,
     display: NonNull<XDisplay>,
-    windows: BTreeMap<WindowHandle, X11NativeWindow>,
+    windows: HashMap<WindowHandle, X11NativeWindow>,
     event_queue: VecDeque<Event>,
     prev_key: Option<KeyCode>,
-    is_composing: bool,
     str_buffer: Vec<u8>,
     n_windows: u32,
 }
@@ -99,10 +97,9 @@ impl X11Backend {
                 root,
                 xim,
                 display,
-                windows: BTreeMap::new(),
+                windows: HashMap::new(),
                 event_queue: VecDeque::new(),
                 prev_key: None,
-                is_composing: false,
                 str_buffer: vec![0; 16],
                 n_windows: 0,
             })
@@ -307,7 +304,6 @@ impl X11Backend {
                 let time = Duration::from_millis(xevent.time);
 
                 let handle = xevent.window.into_window_handle();
-                let window = self.windows.get(&handle)?;
 
                 let mouse_button = match xevent.button {
                     1 => MouseButton::Left,
@@ -364,7 +360,6 @@ impl X11Backend {
                 let time = Duration::from_millis(0);
 
                 let handle = xevent.window.into_window_handle();
-                let window = self.windows.get(&handle)?;
 
                 self.event_queue.push_back(Event {
                     time,
@@ -378,7 +373,6 @@ impl X11Backend {
                 let time = Duration::from_millis(xevent.time);
 
                 let handle = xevent.window.into_window_handle();
-                let window = self.windows.get(&handle)?;
 
                 self.event_queue.push_back(Event {
                     time,
@@ -392,7 +386,6 @@ impl X11Backend {
                 let time = Duration::from_millis(xevent.time);
 
                 let handle = xevent.window.into_window_handle();
-                let window = self.windows.get(&handle)?;
 
                 let kind = if xevent.type_id == et::ENTER_NOTIFY {
                     EventKind::Mouse(MouseEvent::CursorIn(xevent.x, xevent.y))
@@ -464,7 +457,7 @@ unsafe fn place_ime(x11: &LibX11, xic: NonNull<_XIC>, place: XPoint) {
         null_mut::<c_void>(),
     );
 
-    (x11.XFree)(preedit_attr as *mut c_void);
+    (x11.XFree)(preedit_attr);
 }
 
 unsafe fn utf8_lookup_string<'a>(
