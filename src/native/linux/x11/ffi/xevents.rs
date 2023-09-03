@@ -7,7 +7,7 @@ use super::{Atom, Bool, Colormap, Drawable, Time, XDisplay, XWindow, XID};
 #[derive(Clone, Copy, Debug)]
 pub struct XAnyEvent {
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -21,7 +21,7 @@ pub struct XAnyEvent {
 pub struct XButtonEvent {
     /// ButtonPress or ButtonRelease
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -58,7 +58,7 @@ pub type XButtonReleasedEvent = XButtonEvent;
 pub struct XKeyEvent {
     /// KeyPress or KeyRelease
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -95,7 +95,7 @@ pub type XKeyReleasedEvent = XKeyEvent;
 pub struct XMotionEvent {
     /// KeyPress or KeyRelease
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -131,7 +131,7 @@ pub type XPointerMovedEvent = XMotionEvent;
 pub struct XCrossingEvent {
     /// EnterNotify or LeaveNotify
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -173,7 +173,7 @@ pub type XLeaveWindowEvent = XCrossingEvent;
 pub struct XFocusChangeEvent {
     /// EnterNotify or LeaveNotify
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -195,7 +195,7 @@ pub type XFocusOutEvent = XFocusChangeEvent;
 pub struct XExposeEvent {
     /// Expose
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -216,7 +216,7 @@ pub struct XExposeEvent {
 pub struct XGraphicsExposeEvent {
     /// Expose
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -240,7 +240,7 @@ pub struct XGraphicsExposeEvent {
 pub struct XNoExposeEvent {
     /// NoExpose
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -258,7 +258,7 @@ pub struct XNoExposeEvent {
 pub struct XVisibilityEvent {
     /// VisibiltyNotify
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -273,7 +273,7 @@ pub struct XVisibilityEvent {
 pub struct XCreateWindowEvent {
     /// CreateNotify
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -302,7 +302,7 @@ pub struct XCreateWindowEvent {
 pub struct XDestroyWindowEvent {
     /// DestroyNotify
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -317,7 +317,7 @@ pub struct XDestroyWindowEvent {
 pub struct XUnmapEvent {
     /// UnmapNotify
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -333,7 +333,7 @@ pub struct XUnmapEvent {
 pub struct XMapEvent {
     /// UnmapNotify
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -350,7 +350,7 @@ pub struct XMapEvent {
 pub struct XMapRequestEvent {
     /// CreateNotify
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -365,7 +365,7 @@ pub struct XMapRequestEvent {
 pub struct XReparentEvent {
     /// CreateNotify
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -383,7 +383,7 @@ pub struct XReparentEvent {
 pub struct XConfigureEvent {
     /// ConfigureNotify
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -405,7 +405,7 @@ pub struct XConfigureEvent {
 pub struct XGravityEvent {
     /// GravityNotify
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -422,7 +422,7 @@ pub struct XGravityEvent {
 pub struct XResizeRequestEvent {
     /// ResizeRequest
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -439,7 +439,7 @@ pub struct XResizeRequestEvent {
 pub struct XConfigureRequestEvent {
     /// ConfigureRequest
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -462,7 +462,7 @@ pub struct XConfigureRequestEvent {
 pub struct XCirculateEvent {
     /// CirculateNotify
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -479,7 +479,7 @@ pub struct XCirculateEvent {
 pub struct XCirculateRequestEvent {
     /// CirculateRequest
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -496,7 +496,7 @@ pub struct XCirculateRequestEvent {
 pub struct XPropertyEvent {
     /// PropertyNotify
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -514,7 +514,7 @@ pub struct XPropertyEvent {
 pub struct XSelectionClearEvent {
     /// SelectionClear
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -530,7 +530,7 @@ pub struct XSelectionClearEvent {
 pub struct XSelectionRequestEvent {
     /// SelectionRequest
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -549,7 +549,7 @@ pub struct XSelectionRequestEvent {
 pub struct XSelectionEvent {
     /// SelectionNotify
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -567,7 +567,7 @@ pub struct XSelectionEvent {
 pub struct XColormapEvent {
     /// ColormapNotify
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -595,7 +595,7 @@ pub union XClientMessageData {
 pub struct XClientMessageEvent {
     /// ClientMessage
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -641,7 +641,7 @@ impl std::fmt::Debug for XClientMessageEvent {
 pub struct XMappingEvent {
     /// MappingNotify
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
@@ -677,7 +677,7 @@ pub struct XErrorEvent {
 pub struct XKeymapEvent {
     /// KeymapNotify
     pub type_id: c_int,
-    /// # of last request processed by server
+    /// \# of last request processed by server
     pub serial: c_ulong,
     /// true if this came from a SendEvent request
     pub send_event: Bool,
