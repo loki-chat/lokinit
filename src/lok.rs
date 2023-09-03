@@ -52,7 +52,7 @@ static INITIALIZED: AtomicBool = AtomicBool::new(false);
 
 /// Initializes Lokinit with a default backend.
 pub fn init() {
-    init_backend::<DefaultLokinitBackend>();
+    init_backend::<DefaultLokinitBackend>()
 }
 
 pub fn init_backend<B: LokinitBackend + 'static>() {
@@ -67,7 +67,7 @@ pub fn init_backend<B: LokinitBackend + 'static>() {
             INITIALIZED.store(true, Ordering::Release);
             Box::new(backend)
         });
-    });
+    })
 }
 
 pub fn with<R>(callback: impl FnOnce(&mut dyn LokinitBackend) -> R) -> R {
