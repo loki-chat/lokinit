@@ -4,7 +4,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::native::DefaultLokinitBackend;
+use crate::{native::DefaultLokinitBackend, window::ScreenMode};
 
 use {
     crate::{
@@ -38,6 +38,8 @@ pub trait LokinitBackend {
 
     fn poll_event(&mut self) -> Option<Event>;
 
+    fn set_screen_mode(&mut self, handle: WindowHandle, screen_mode: ScreenMode);
+
     // TODO: implement monitor fetching in native backends
     fn fetch_monitors(&mut self) -> Vec<Monitor> {
         unimplemented!()
@@ -65,7 +67,7 @@ static INITIALIZED: AtomicBool = AtomicBool::new(false);
 
 /// Initializes Lokinit with a default backend.
 pub fn init() {
-    init_backend::<DefaultLokinitBackend>();
+    init_backend::<DefaultLokinitBackend>()
 }
 
 pub fn init_backend<B: LokinitBackend + 'static>() {
@@ -80,7 +82,7 @@ pub fn init_backend<B: LokinitBackend + 'static>() {
             INITIALIZED.store(true, Ordering::Release);
             Box::new(backend)
         });
-    });
+    })
 }
 
 pub fn with<R>(callback: impl FnOnce(&mut dyn LokinitBackend) -> R) -> R {
@@ -107,6 +109,10 @@ pub fn close_window(handle: WindowHandle) {
 
 pub fn poll_event() -> Option<Event> {
     with(|instance| instance.poll_event())
+}
+
+pub fn set_screen_mode(handle: WindowHandle, screen_mode: ScreenMode) {
+    with(|instance| instance.set_screen_mode(handle, screen_mode))
 }
 
 pub fn fetch_monitors() -> Vec<Monitor> {

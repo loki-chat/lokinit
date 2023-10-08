@@ -26,7 +26,7 @@ pub type KeySym = XID;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct XWindow(c_ulong);
+pub struct XWindow(pub(crate) c_ulong);
 
 impl XWindow {
     pub const NONE: Self = XWindow(0);
@@ -334,6 +334,13 @@ library! {
 
     pub fn XPending(display: *mut XDisplay) -> c_int;
     pub fn XNextEvent(display: *mut XDisplay, event: *mut XEvent) -> c_int;
+    pub fn XSendEvent(
+        display: *mut XDisplay,
+        window: XWindow,
+        propagate: c_int,
+        event_mask: c_long,
+        event_send: *mut XEvent,
+    ) -> c_int;
 
     // XKB
 

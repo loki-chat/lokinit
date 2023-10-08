@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use crate::event::Event;
 use crate::lok::{CreateWindowError, LokinitBackend};
-use crate::window::{WindowBuilder, WindowHandle};
+use crate::window::{WindowBuilder, WindowHandle, ScreenMode};
 
 use dl::{dlopen, dlsym, get_dlerror, RTLD_NOW};
 use wayland::WaylandBackend;
@@ -118,11 +118,24 @@ impl LokinitBackend for LinuxBackend {
 
     #[cfg(feature = "raw-window-handle")]
     fn raw_display_handle(&self) -> raw_window_handle::RawDisplayHandle {
-        todo!()
+        match self {
+            Self::X11(_x11) => todo!(),
+            Self::Wayland(_wl) => todo!(),
+        }
     }
 
     #[cfg(feature = "raw-window-handle")]
     fn raw_window_handle_for(&self, window_handle: WindowHandle) -> raw_window_handle::RawWindowHandle {
-        todo!()
+        match self {
+            Self::X11(_x11) => todo!(),
+            Self::Wayland(_wl) => todo!(),
+        }
+    }
+
+    fn set_screen_mode(&mut self, handle: WindowHandle, screen_mode: ScreenMode) {
+        match self {
+            Self::X11(x11) => x11.set_screen_mode(handle, screen_mode),
+            Self::Wayland(_wl) => todo!(),
+        }
     }
 }
