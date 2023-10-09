@@ -7,3 +7,6 @@ license = "MIT/Apache-2.0"
 authors = ["The Loki Authors"]
 keywords = ["windowing"]
 categories = ["gui"]
+
+[target.'cfg(target_os = "macos")'.dependencies]
+syntax = { git = "https://github.com/Bright-Shard/syntax.git" }
