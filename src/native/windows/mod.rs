@@ -1,20 +1,20 @@
 use std::{
     cell::RefCell,
     collections::{BTreeSet, VecDeque},
-    time::Duration,
+    time::Duration, default,
 };
 
 use crate::{
     event::{Event, EventKind},
     lok::{CreateWindowError, LokinitBackend, Monitor},
-    window::{ScreenMode, WindowBuilder, WindowHandle},
+    window::{ScreenMode, WindowBuilder, WindowHandle, WindowBorder},
 };
 
 use winapi::{
     shared::{
         minwindef::{DWORD, LPARAM, LRESULT, UINT, WPARAM},
         ntdef::NULL,
-        windef::{HWND, RECT},
+        windef::{HWND, RECT}, windowsx::{GET_X_LPARAM, GET_Y_LPARAM},
     },
     um::{libloaderapi::GetModuleHandleW, winuser::*},
 };
@@ -22,11 +22,20 @@ use winapi::{
 #[derive(Default)]
 pub struct WindowsBackend {
     window_handles: BTreeSet<WindowHandle>,
+    window_resize_direction: Option<WindowBorder>,
+    window_x_border_size: i32,
+    window_y_border_size: i32,
+    window_title_size: i32,
 }
 
 impl LokinitBackend for WindowsBackend {
     fn init() -> Self {
-        Self::default()
+        Self {  
+            window_handles: BTreeSet::<WindowHandle>::default(), 
+            window_resize_direction: None, 
+            window_x_border_size: unsafe { GetSystemMetrics(SM_CXBORDER) }, 
+            window_y_border_size: unsafe { GetSystemMetrics(SM_CYBORDER) }, 
+            window_title_size: unsafe { GetSystemMetrics(SM_CYCAPTION) } }
     }
 
     fn create_window(&mut self, builder: WindowBuilder) -> Result<WindowHandle, CreateWindowError> {
@@ -115,19 +124,51 @@ impl LokinitBackend for WindowsBackend {
                 let mut msg: MSG = std::mem::zeroed();
                 if PeekMessageW(&mut msg, NULL as _, 0, 0, PM_REMOVE) != 0 {
                     let window = WindowHandle(msg.hwnd as usize);
-                    println!("peeking message");
+                    //println!("peeking message");
 
-                    if WM_QUIT == msg.message {
-                        println!("quitting");
-                        return Some(Event {
-                            time: Duration::from_millis(1),
-                            window,
-                            kind: EventKind::CloseRequested,
-                        });
-                    } else {
-                        TranslateMessage(&mut msg as *mut _ as _);
-                        DispatchMessageW(&mut msg as *mut _ as _);
+                    match msg.message {
+                        WM_QUIT => {
+                            println!("quitting");
+                            return Some(Event {
+                                time: Duration::from_millis(1),
+                                window,
+                                kind: EventKind::CloseRequested,
+                            });
+                        }
+                        WM_NCLBUTTONDOWN => {
+                            self.window_resize_direction = WindowBorder::try_from(std::mem::transmute::<usize, isize>(msg.wParam)).ok();
+                            println!("{:?}", self.window_resize_direction);
+                            SetCapture(msg.hwnd);
+                        }
+                        WM_LBUTTONUP => {
+                            self.window_resize_direction = None;
+                            ReleaseCapture();
+                        }
+                        WM_MOUSEMOVE => {
+                            if self.window_resize_direction != None {
+                                let mut clientrect = RECT{left:0, right:0, top:0, bottom:0};
+                                GetWindowRect(msg.hwnd, &clientrect as *const _ as _); 
+                                println!("left:{0}, right:{1}, top: {2}, bottom:{3}", clientrect.left, clientrect.right, clientrect.top, clientrect.bottom);
+                                match self.window_resize_direction.unwrap() {
+                                    WindowBorder::Top => {clientrect.top += (GET_Y_LPARAM(msg.lParam) + self.window_y_border_size +self.window_title_size)},
+                                    WindowBorder::Bottom => {clientrect.bottom = (GET_Y_LPARAM(msg.lParam)+clientrect.top+2*self.window_y_border_size+self.window_title_size)},
+                                    WindowBorder::Left => {clientrect.left += (GET_X_LPARAM(msg.lParam)-self.window_x_border_size)},
+                                    WindowBorder::Right => {clientrect.right = (GET_X_LPARAM(msg.lParam)+clientrect.left+2*self.window_x_border_size)},
+                                    WindowBorder::TopLeft => todo!(),
+                                    WindowBorder::TopRight => todo!(),
+                                    WindowBorder::BottomLeft => todo!(),
+                                    WindowBorder::BottomRight => todo!(),
+                                }
+                                println!("left:{0}, right:{1}, top: {2}, bottom:{3}", clientrect.left, clientrect.right, clientrect.top, clientrect.bottom);
+                                SetWindowPos(msg.hwnd, NULL as _, clientrect.left, clientrect.top, (clientrect.right-clientrect.left), (clientrect.bottom - clientrect.top), NULL as _);
+                            }
+                        }
+                        _ => {}
                     }
+
+                    TranslateMessage(&mut msg as *mut _ as _);
+                    //DispatchMessageW(&mut msg as *mut _ as _);
+                    
                 }
             }
 
@@ -207,7 +248,7 @@ unsafe extern "system" fn win32_wndproc(
             kind: EventKind::Redraw,
         }),
     }
-    println!("Events in wndproc: {}", n_events());
+    //println!("Events in wndproc: {}", n_events());
 
     DefWindowProcW(hwnd, umsg, wparam, lparam)
 }

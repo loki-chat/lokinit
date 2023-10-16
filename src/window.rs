@@ -1,3 +1,7 @@
+use std::string::ParseError;
+
+use winapi::um::winuser::{HTBOTTOMRIGHT, HTBOTTOMLEFT, HTLEFT, HTTOPLEFT, HTTOP, HTTOPRIGHT, HTRIGHT, HTBOTTOM};
+
 use crate::lok::MonitorId;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -22,6 +26,38 @@ impl WindowSize {
     pub fn new(width: u32, height: u32) -> Self {
         Self { width, height }
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WindowBorder {
+    Top,
+    Bottom,
+    Left,
+    Right,
+
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+}
+
+impl TryFrom<isize> for WindowBorder {
+    fn try_from(ht: isize) -> Result<WindowBorder, ()> {
+        match ht {
+            HTTOP => Ok(WindowBorder::Top ),
+            HTTOPRIGHT => Ok(WindowBorder::TopRight),
+            HTRIGHT => Ok(WindowBorder::Right),
+            HTBOTTOMRIGHT => Ok(WindowBorder::BottomRight),
+            HTBOTTOM => Ok(WindowBorder::Bottom),
+            HTBOTTOMLEFT => Ok(WindowBorder::BottomLeft),
+            HTLEFT => Ok(WindowBorder::Left),
+            HTTOPLEFT => Ok(WindowBorder::Left),
+            _ => Err(())
+        }
+    }
+
+    type Error = ();
+
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
