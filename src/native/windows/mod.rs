@@ -23,8 +23,7 @@ use winapi::{
 pub struct WindowsBackend {
     window_handles: BTreeSet<WindowHandle>,
     window_resize_direction: Option<WindowBorder>,
-    window_x_border_size: i32,
-    window_y_border_size: i32,
+    window_border_size: i32,
     window_title_size: i32,
 }
 
@@ -33,8 +32,7 @@ impl LokinitBackend for WindowsBackend {
         Self {  
             window_handles: BTreeSet::<WindowHandle>::default(), 
             window_resize_direction: None, 
-            window_x_border_size: unsafe { GetSystemMetrics(SM_CXBORDER) }, 
-            window_y_border_size: unsafe { GetSystemMetrics(SM_CYBORDER) }, 
+            window_border_size: unsafe { GetSystemMetrics(SM_CXSIZEFRAME) }, 
             window_title_size: unsafe { GetSystemMetrics(SM_CYCAPTION) } }
     }
 
@@ -146,21 +144,21 @@ impl LokinitBackend for WindowsBackend {
                         }
                         WM_MOUSEMOVE => {
                             if self.window_resize_direction != None {
-                                let mut clientrect = RECT{left:0, right:0, top:0, bottom:0};
-                                GetWindowRect(msg.hwnd, &clientrect as *const _ as _); 
-                                println!("left:{0}, right:{1}, top: {2}, bottom:{3}", clientrect.left, clientrect.right, clientrect.top, clientrect.bottom);
+                                let mut window_rect = RECT{left:0, right:0, top:0, bottom:0};
+                                GetWindowRect(msg.hwnd, &window_rect as *const _ as _); 
+                                println!("left:{0}, right:{1}, top: {2}, bottom:{3}", window_rect.left, window_rect.right, window_rect.top, window_rect.bottom);
                                 match self.window_resize_direction.unwrap() {
-                                    WindowBorder::Top => {clientrect.top += (GET_Y_LPARAM(msg.lParam) + self.window_y_border_size +self.window_title_size)},
-                                    WindowBorder::Bottom => {clientrect.bottom = (GET_Y_LPARAM(msg.lParam)+clientrect.top+2*self.window_y_border_size+self.window_title_size)},
-                                    WindowBorder::Left => {clientrect.left += (GET_X_LPARAM(msg.lParam)-self.window_x_border_size)},
-                                    WindowBorder::Right => {clientrect.right = (GET_X_LPARAM(msg.lParam)+clientrect.left+2*self.window_x_border_size)},
+                                    WindowBorder::Top => {window_rect.top += (GET_Y_LPARAM(msg.lParam) + self.window_border_size +self.window_title_size)},
+                                    WindowBorder::Bottom => {window_rect.bottom = (GET_Y_LPARAM(msg.lParam)+window_rect.top+2*self.window_border_size+self.window_title_size)},
+                                    WindowBorder::Left => {window_rect.left += (GET_X_LPARAM(msg.lParam)+self.window_border_size)},
+                                    WindowBorder::Right => {window_rect.right = (GET_X_LPARAM(msg.lParam)+window_rect.left+2*self.window_border_size)},
                                     WindowBorder::TopLeft => todo!(),
                                     WindowBorder::TopRight => todo!(),
                                     WindowBorder::BottomLeft => todo!(),
                                     WindowBorder::BottomRight => todo!(),
                                 }
-                                println!("left:{0}, right:{1}, top: {2}, bottom:{3}", clientrect.left, clientrect.right, clientrect.top, clientrect.bottom);
-                                SetWindowPos(msg.hwnd, NULL as _, clientrect.left, clientrect.top, (clientrect.right-clientrect.left), (clientrect.bottom - clientrect.top), NULL as _);
+                                println!("left:{0}, right:{1}, top: {2}, bottom:{3}", window_rect.left, window_rect.right, window_rect.top, window_rect.bottom);
+                                SetWindowPos(msg.hwnd, NULL as _, window_rect.left, window_rect.top, (window_rect.right-window_rect.left), (window_rect.bottom - window_rect.top), NULL as _);
                             }
                         }
                         _ => {}
