@@ -15,6 +15,7 @@ pub struct VTables {
     pub nsevent: NSEventVTable,
     pub nscursor: NSCursorVTable,
     pub nsimage: NSImageVTable,
+    pub nsbutton: NSButtonVTable,
 }
 impl VTables {
     /// Wraps around `VTABLES.with` and auto-unwraps the OnceCell. This is purely to remove some
@@ -23,15 +24,17 @@ impl VTables {
     pub fn with<R, F: Fn(&Self) -> R>(func: F) -> R {
         VTABLES.with(|vtables| func(vtables.get().unwrap()))
     }
+
+    /// Loads all the VTables. This is called in `lok::init()`, and must be called before any
+    /// Lokinit code actually runs, because the macOS code will unwrap the VTables and assume
+    /// it's loaded.
+    pub fn init() {
+        VTABLES.with(|vtables| vtables.set(VTables::default()).unwrap());
+    }
 }
 
 thread_local! {
     pub static VTABLES: OnceCell<VTables> = OnceCell::new();
-}
-/// Load all the VTables. This must be called during `lok::init()`, because the rest of the program
-/// assumes that the VTables have been loaded and will unwrap the OnceCell to avoid overhead.
-pub fn init_vtables() {
-    VTABLES.with(|vtables| vtables.set(VTables::default()).unwrap());
 }
 
 /// A VTable for the NSApplication class.
@@ -39,15 +42,15 @@ pub fn init_vtables() {
 pub struct NSAppVTable {
     /// The NSApplication class pointer.
     pub class: *mut c_void,
+    // TODO: Should link to apple docs instead of listing useless objc methods
     /// The NSApplication instance returned from [NSApplication sharedApplication].
     pub shared: *mut c_void,
     /// The [NSApplication nextEvent] message.
     pub next_event_sel: *mut c_void,
     /// The [NSApplication setActivationPolicy:] message.
     pub set_activation_policy_sel: *mut c_void,
+    // TODO: On macOS >= 10.14, this method is deprecated, and [NSApplication activate] is used instead.
     /// The [NSApplication activateIgnoringOtherApps:] message.
-    /// Note: This message is deprecated on macOS >=10.14. Need to check macOS version at runtime,
-    /// and use [NSApplication activate] on newer versions.
     pub activate_ignoring_other_apps_sel: *mut c_void,
     /// The [NSApplication finishLaunching] message.
     pub finish_launching_sel: *mut c_void,
@@ -81,6 +84,7 @@ impl Default for NSAppVTable {
 pub struct NSWindowVTable {
     /// The NSWindow class pointer.
     pub class: *mut c_void,
+    // TODO: Should link to apple docs instead of listing useless objc methods
     /// The [NSWindow alloc] message.
     pub alloc_sel: *mut c_void,
     /// The [NSWindow initWithContentRect:styleMask:backing:defer:screen:] message.
@@ -99,6 +103,8 @@ pub struct NSWindowVTable {
     pub frame_sel: *mut c_void,
     /// The [NSWindow setFrame:display:] message.
     pub set_frame_sel: *mut c_void,
+    /// https://developer.apple.com/documentation/appkit/nswindow/1419491-standardwindowbutton?language=objc
+    pub std_window_btn_sel: *mut c_void,
 }
 impl Default for NSWindowVTable {
     fn default() -> Self {
@@ -113,6 +119,25 @@ impl Default for NSWindowVTable {
             window_number_sel: sel!("windowNumber"),
             frame_sel: sel!("frame"),
             set_frame_sel: sel!("setFrame:display:"),
+            std_window_btn_sel: sel!("standardWindowButton:"),
+        }
+    }
+}
+
+/// A VTable for the NSButton class.
+#[derive(Debug)]
+pub struct NSButtonVTable {
+    /// https://developer.apple.com/documentation/appkit/nsbutton/1534156-highlight?language=objc
+    pub highlight_sel: *mut c_void,
+    /// https://developer.apple.com/documentation/appkit/nsview/1483737-superview?language=objc
+    /// Ok, yes, it's from NSView, but I'm too lazy to make a new vtable for just this
+    pub superview_sel: *mut c_void,
+}
+impl Default for NSButtonVTable {
+    fn default() -> Self {
+        Self {
+            highlight_sel: sel!("highlight:"),
+            superview_sel: sel!("superview"),
         }
     }
 }
@@ -122,6 +147,7 @@ impl Default for NSWindowVTable {
 pub struct NSRectVTable {
     /// The NSRect class pointer.
     pub class: *mut c_void,
+    // TODO: Should link to apple docs instead of listing useless objc methods
     /// The [NSRect alloc] message.
     pub alloc_sel: *mut c_void,
     /// The [NSRect x:y:width:height:] message.
@@ -142,6 +168,7 @@ impl Default for NSRectVTable {
 pub struct NSScreenVTable {
     /// The NSScreen class pointer.
     pub class: *mut c_void,
+    // TODO: Should link to apple docs instead of listing useless objc methods
     /// The [NSScreen mainScreen] message.
     pub main_screen_sel: *mut c_void,
 }
@@ -159,6 +186,7 @@ impl Default for NSScreenVTable {
 pub struct NSStringVTable {
     /// The NSString class pointer.
     pub class: *mut c_void,
+    // TODO: Should link to apple docs instead of listing useless objc methods
     /// The [NSString alloc] message.
     pub alloc: *mut c_void,
     /// The [NSString initWithBytes:length:encoding] message.
@@ -195,6 +223,7 @@ impl Default for NSDateVTable {
 pub struct NSEventVTable {
     /// The NSEvent class pointer.
     pub class: *mut c_void,
+    // TODO: Should link to apple docs instead of listing useless objc methods
     /// The [NSEvent type] message.
     pub type_sel: *mut c_void,
     /// The [NSEvent subtype] message.
@@ -219,6 +248,7 @@ impl Default for NSEventVTable {
 /// A VTable for the NSCursor class.
 #[derive(Debug)]
 pub struct NSCursorVTable {
+    // TODO: Add docs for these ptrs
     pub class: *mut c_void,
     pub alloc: *mut c_void,
     /// The [NSCursor initWithImage:hotSpot:] message.
@@ -241,6 +271,7 @@ impl Default for NSCursorVTable {
 pub struct NSImageVTable {
     /// The NSImage class pointer.
     pub class: *mut c_void,
+    // TODO: Should link to apple docs instead of listing useless objc methods
     /// The [NSImage alloc] message.
     pub alloc: *mut c_void,
     /// The [initWithContentsOfFile:] message.

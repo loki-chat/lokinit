@@ -44,6 +44,7 @@ use super::MacosBackend;
 
 pub mod cursor;
 pub mod enums;
+pub mod event;
 pub mod ffi;
 pub mod macros;
 pub mod vtables;
@@ -57,13 +58,16 @@ use {
     vtables::VTables,
 };
 
-// region: NSApp
-
-pub struct NSApp {}
+/// A wrapper around the NSApplication class.
+///
+/// In usual Swift code, you initialize the NSApplication class, and then use the global NSApp
+/// variable to interact with that instance. This provides an almost identical API by using an
+/// empty struct. The pointer to that NSApplication instance is stored in the `nsapp` vtable.
+pub struct NSApp;
 impl NSApp {
     /// We have to tell NSApplication to launch and configure a few things before we can use it.
     /// This method takes care of that.
-    pub fn load() {
+    pub fn load(&self) {
         let (instance, set_activation_policy, activate, finish_launching) =
             VTables::with(|vtables| {
                 (
@@ -82,7 +86,7 @@ impl NSApp {
     }
 
     /// Calls [NSApp nextEventMatchingMask:...], then creates an NSEvent struct around that.
-    pub fn next_event() -> NSEvent {
+    pub fn next_event(&self) -> NSEvent {
         let (nsapp, next_event, distant_future) = VTables::with(|vtables| {
             (
                 vtables.nsapp.shared,
@@ -97,22 +101,7 @@ impl NSApp {
         let ptr = msg_ret![nsapp next_event nextEventMatchingMask:mask untilDate:distant_future inMode:mode dequeue:true];
         NSEvent { ptr }
     }
-
-    /// Forwards an event to the NSApplication. Lokinit tries to do this as little as possible,
-    /// because this method sometimes hijacks the thread (for example, if you forward resize events
-    /// to it, the whole thread will freeze until the resize is completed).
-    pub fn send_event(event: NSEvent) {
-        let (nsapp, send_event) =
-            VTables::with(|vtables| (vtables.nsapp.shared, vtables.nsapp.send_event_sel));
-        let event = event.ptr;
-
-        msg![nsapp send_event sendEvent:event];
-    }
 }
-
-// endregion: NSApp
-
-// region: NSWindow
 
 #[derive(Clone, Copy)]
 pub enum NSWindowBorder {
@@ -129,24 +118,32 @@ pub enum NSWindowBorder {
 
 /// A struct for interacting with an Objective-C NSWindow instance.
 pub struct NSWindow {
-    /// A pointer to the actual (Objective-C) NSWindow instance.
+    /// A pointer to the underlying (Objective-C) NSWindow instance.
     pub ptr: *mut c_void,
-    // Mouse targets in the window. If the mouse starts dragging from in one of these borders, we
-    // should resize the window.
+    /// The top border of the window. If the mouse drags inside this, we should resize.
     pub top_mouse_border: NSRect,
+    /// The bottom border of the window. If the mouse drags inside this, we should resize.
     pub bottom_mouse_border: NSRect,
+    /// The left border of the window. If the mouse drags inside this, we should resize.
     pub left_mouse_border: NSRect,
+    /// The right border of the window. If the mouse drags inside this, we should resize.
     pub right_mouse_border: NSRect,
+    /// The top-left corner of the window. If the mouse drags inside this, we should resize.
     pub top_left_mouse_border: NSRect,
+    /// The top-right corner of the window. If the mouse drags inside this, we should resize.
     pub top_right_mouse_border: NSRect,
+    /// The bottom-left corner of the window. If the mouse drags inside this, we should resize.
     pub bottom_left_mouse_border: NSRect,
+    /// The bottom-right corner of the window. If the mouse drags inside this, we should resize.
     pub bottom_right_mouse_border: NSRect,
+    /// A rectangle around the stoplight buttons in the window.
+    pub stoplight_buttons_rect: NSRect,
+    /// The entire window's rectangle.
+    pub rect: NSRect,
     /// The direction the window is currently being resized.
     pub resize_direction: Option<NSWindowBorder>,
     /// The window border the mouse is currently hovered over.
     pub hover_border: Option<NSWindowBorder>,
-    /// The window size.
-    pub rect: NSRect,
     /// The window's ID.
     pub id: usize,
 }
@@ -181,14 +178,17 @@ impl NSWindow {
         msg![instance init initWithContentRect:rect_clone styleMask:mask backing:backing defer:false screen:screen];
 
         let title = str_to_nsstring(name);
-
         msg![instance set_title setTitle:title];
+
         if centered {
             msg![instance center];
         }
 
         let id: isize = msg_ret![instance id];
         let id = id as usize;
+
+        // Create a rectangle around the 3 stoplight buttons, so we can check if the mouse
+        // is hovering over them.
 
         let mut this = Self {
             ptr: instance,
@@ -202,17 +202,21 @@ impl NSWindow {
             top_right_mouse_border: NSRect::new(0., 0., 0., 0.),
             bottom_left_mouse_border: NSRect::new(0., 0., 0., 0.),
             bottom_right_mouse_border: NSRect::new(0., 0., 0., 0.),
+            stoplight_buttons_rect: NSRect::new(0., 0., 0., 0.),
             resize_direction: None,
             hover_border: None,
         };
         this.recalculate_window_rect();
-        this.make_main(backend);
+        this.make_main();
+        backend.frontmost_window = Some(id);
 
         this
     }
 
     /// Makes the window the frontmost window.
-    pub fn make_main(&self, backend: &mut MacosBackend) {
+    ///
+    /// Note: This does *not* set `MacosBackend::frontmost_window`. That must be set separately.
+    pub fn make_main(&self) {
         let instance = self.ptr;
         let sender: *mut c_void = std::ptr::null_mut();
         let (make_key_and_order_front, make_main) = VTables::with(|vtables| {
@@ -224,7 +228,6 @@ impl NSWindow {
 
         msg![instance make_key_and_order_front makeKeyAndOrderFront:sender];
         msg![instance make_main];
-        backend.frontmost_window = Some(self.id);
     }
 
     /// Update location, size, and border locations
@@ -278,6 +281,36 @@ impl NSWindow {
         self.bottom_right_mouse_border.origin.y = -(Self::BORDER_SIZE / 2.);
         self.bottom_right_mouse_border.size.width = Self::BORDER_SIZE;
         self.bottom_right_mouse_border.size.height = Self::BORDER_SIZE;
+
+        let (std_window_btn, superview, frame) = VTables::with(|vtables| {
+            (
+                vtables.nswindow.std_window_btn_sel,
+                vtables.nsbutton.superview_sel,
+                vtables.nswindow.frame_sel,
+            )
+        });
+
+        let instance = self.ptr;
+        let close_btn = NSWindowButton::Close;
+        let close_btn = msg_ret![instance std_window_btn standardWindowButton:close_btn];
+        // let close_btn = msg_ret![close_btn superview];
+        let zoom_btn = NSWindowButton::Close;
+        let zoom_btn = msg_ret![instance std_window_btn standardWindowButton:zoom_btn];
+        // let zoom_btn = msg_ret![zoom_btn superview];
+        let titlebar = msg_ret![close_btn superview];
+        let titlebar = msg_ret![titlebar superview];
+
+        let close_btn: NSRect = msg_ret![close_btn frame];
+        let zoom_btn: NSRect = msg_ret![zoom_btn frame];
+        let titlebar: NSRect = msg_ret![titlebar frame];
+        println!("zoom btn: {zoom_btn:?}");
+
+        self.stoplight_buttons_rect = NSRect::new(
+            close_btn.origin.x + titlebar.origin.x,
+            close_btn.origin.y + titlebar.origin.y,
+            ((zoom_btn.origin.x + zoom_btn.size.width) * 3.) - close_btn.origin.x,
+            zoom_btn.size.height,
+        );
     }
 
     /// Check if the mouse is dragging in a certain direction.
@@ -346,10 +379,6 @@ impl NSWindow {
     }
 }
 
-// endregion: NSWindow
-
-// region: NSEvent
-
 #[derive(Debug)]
 pub struct NSEvent {
     pub ptr: *mut c_void,
@@ -361,246 +390,6 @@ impl NSEvent {
 
         msg_ret![instance event_subtype]
     }
-
-    pub fn handle(self, backend: &mut MacosBackend) -> Option<Event> {
-        let (nsevent, event_type, event_subtype, window_id, mouse_pos) = VTables::with(|vtables| {
-            (
-                vtables.nsevent.class,
-                vtables.nsevent.type_sel,
-                vtables.nsevent.subtype_sel,
-                vtables.nsevent.window_number_sel,
-                vtables.nsevent.mouse_location_sel,
-            )
-        });
-        let instance = self.ptr;
-
-        let window_id: isize = msg_ret![instance window_id];
-        let window_id = window_id as usize;
-        let event_type: NSEventType = msg_ret![instance event_type];
-
-        match event_type {
-            // Several of these event types use private APIs, forcing us to forward the event to
-            // AppKit (trying to access those APIs could result in apps using Lokinit getting
-            // rejected from the app store). This, however, is pretty much the only time
-            // we do so.
-            NSEventType::AppKitDefined => {
-                let event_subtype: NSEventSubtype = msg_ret![instance event_subtype];
-
-                match event_subtype {
-                    NSEventSubtype::ApplicationActivated
-                    | NSEventSubtype::ApplicationDeactivated => {
-                        NSApp::send_event(self);
-                        None
-                    }
-                    NSEventSubtype::WindowMoved => {
-                        let window = backend.windows.get_mut(&window_id).unwrap();
-                        // Yes, we will get window moved events while trying to resize... pretty cringe ngl
-                        if window.resize_direction.is_some() {
-                            return None;
-                        }
-
-                        NSApp::send_event(self);
-                        window.recalculate_window_rect();
-
-                        Some(Event {
-                            time: Duration::ZERO,
-                            window: WindowHandle(window_id),
-                            kind: EventKind::Moved(
-                                window.rect.origin.x as i32,
-                                window.rect.origin.y as i32,
-                            ),
-                        })
-                    }
-                    _ => None,
-                }
-            }
-
-            NSEventType::MouseMoved
-            | NSEventType::LeftMouseDragged
-            | NSEventType::RightMouseDragged => {
-                let window = backend
-                    .windows
-                    .get_mut(&backend.frontmost_window.unwrap())
-                    .unwrap();
-                let mouse_pos: NSPoint = msg_ret![nsevent mouse_pos];
-                let mouse_pos = window.screen_point_to_local_point(mouse_pos);
-
-                if let Some(border) = window.resize_direction {
-                    match border {
-                        NSWindowBorder::Top => {
-                            window.rect.size.height = mouse_pos.y;
-                        }
-                        NSWindowBorder::Bottom => {
-                            window.rect.origin.y += mouse_pos.y;
-                            window.rect.size.height -= mouse_pos.y;
-                        }
-                        NSWindowBorder::Left => {
-                            window.rect.origin.x += mouse_pos.x;
-                            window.rect.size.width -= mouse_pos.x;
-                        }
-                        NSWindowBorder::Right => {
-                            window.rect.size.width = mouse_pos.x;
-                        }
-                        NSWindowBorder::TopLeft => {
-                            window.rect.size.height = mouse_pos.y;
-                            window.rect.origin.x += mouse_pos.x;
-                            window.rect.size.width -= mouse_pos.x;
-                        }
-                        NSWindowBorder::TopRight => {
-                            window.rect.size.height = mouse_pos.y;
-                            window.rect.size.width = mouse_pos.x;
-                        }
-                        NSWindowBorder::BottomLeft => {
-                            window.rect.origin.y += mouse_pos.y;
-                            window.rect.size.height -= mouse_pos.y;
-                            window.rect.origin.x += mouse_pos.x;
-                            window.rect.size.width -= mouse_pos.x;
-                        }
-                        NSWindowBorder::BottomRight => {
-                            window.rect.origin.y += mouse_pos.y;
-                            window.rect.size.height -= mouse_pos.y;
-                            window.rect.size.width = mouse_pos.x;
-                        }
-                    }
-                    window.apply_size();
-                    window.recalculate_window_borders();
-
-                    None
-                } else {
-                    window.update_hover_border(&mouse_pos);
-
-                    Cursors::with(|cursors| {
-                        if let Some(border) = window.hover_border {
-                            match border {
-                                NSWindowBorder::TopLeft | NSWindowBorder::BottomRight => {
-                                    cursors.get(MacOsCursor::ResizeNorthWestSouthEast)
-                                }
-                                NSWindowBorder::TopRight | NSWindowBorder::BottomLeft => {
-                                    cursors.get(MacOsCursor::ResizeNorthEastSouthWest)
-                                }
-                                NSWindowBorder::Top | NSWindowBorder::Bottom => {
-                                    cursors.get(MacOsCursor::ResizeNorthSouth)
-                                }
-                                NSWindowBorder::Left | NSWindowBorder::Right => {
-                                    cursors.get(MacOsCursor::ResizeEastWest)
-                                }
-                            }
-                            .set();
-
-                            None
-                        } else {
-                            cursors.get(MacOsCursor::Arrow).set();
-
-                            Some(Event {
-                                time: Duration::ZERO,
-                                window: WindowHandle(window_id),
-                                kind: EventKind::Mouse(MouseEvent::CursorMove(
-                                    mouse_pos.x as i32,
-                                    mouse_pos.y as i32,
-                                )),
-                            })
-                        }
-                    })
-                }
-            }
-
-            NSEventType::LeftMouseDown => {
-                let window = backend.windows.get_mut(&window_id).unwrap();
-
-                if window.hover_border.is_some() {
-                    window.resize_direction = window.hover_border;
-                    None
-                } else {
-                    let mouse_pos: NSPoint = msg_ret![nsevent mouse_pos];
-                    let NSPoint { x, y } = window.screen_point_to_local_point(mouse_pos);
-
-                    Some(Event {
-                        time: Duration::ZERO,
-                        window: WindowHandle(window_id),
-                        kind: EventKind::Mouse(MouseEvent::ButtonPress(
-                            MouseButton::Left,
-                            x as i32,
-                            y as i32,
-                        )),
-                    })
-                }
-            }
-            NSEventType::LeftMouseUp => {
-                let window = backend.windows.get_mut(&window_id).unwrap();
-
-                if window.resize_direction.is_some() {
-                    window.resize_direction = None;
-                    Cursors::with(|cursors| cursors.get(MacOsCursor::Arrow).set());
-                    println!("Bruh");
-                    None
-                } else {
-                    let mouse_pos: NSPoint = msg_ret![nsevent mouse_pos];
-                    let NSPoint { x, y } = window.screen_point_to_local_point(mouse_pos);
-
-                    Some(Event {
-                        time: Duration::ZERO,
-                        window: WindowHandle(window_id),
-                        kind: EventKind::Mouse(MouseEvent::ButtonRelease(
-                            MouseButton::Left,
-                            x as i32,
-                            y as i32,
-                        )),
-                    })
-                }
-            }
-
-            NSEventType::RightMouseDown => {
-                let window = backend.windows.get(&window_id).unwrap();
-                let mouse_pos: NSPoint = msg_ret![nsevent mouse_pos];
-                let NSPoint { x, y } = window.screen_point_to_local_point(mouse_pos);
-
-                Some(Event {
-                    time: Duration::ZERO,
-                    window: WindowHandle(window_id),
-                    kind: EventKind::Mouse(MouseEvent::ButtonPress(
-                        MouseButton::Right,
-                        x as i32,
-                        y as i32,
-                    )),
-                })
-            }
-            NSEventType::RightMouseUp => {
-                let window = backend.windows.get(&window_id).unwrap();
-                let mouse_pos: NSPoint = msg_ret![nsevent mouse_pos];
-                let NSPoint { x, y } = window.screen_point_to_local_point(mouse_pos);
-
-                Some(Event {
-                    time: Duration::ZERO,
-                    window: WindowHandle(window_id),
-                    kind: EventKind::Mouse(MouseEvent::ButtonRelease(
-                        MouseButton::Right,
-                        x as i32,
-                        y as i32,
-                    )),
-                })
-            }
-
-            _ => None,
-        }
-    }
-}
-
-// endregion: NSEvent
-
-// region: Utils
-
-pub fn str_to_nsstring(string: &str) -> *mut c_void {
-    let (nsstring, alloc, init) = VTables::with(|vtables| {
-        (
-            vtables.nsstring.class,
-            vtables.nsstring.alloc,
-            vtables.nsstring.init_with_bytes_length_encoding_sel,
-        )
-    });
-    let nsstring = msg_ret![nsstring alloc];
-    let bytes = string.as_ptr();
-    let length = string.len();
-    msg_ret![nsstring init initWithBytes:bytes length:length encoding:4usize]
 }
 
 #[repr(C)]
@@ -638,4 +427,22 @@ impl NSRect {
     }
 }
 
-// endregion: Utils
+/// Allocates an new NSString, then sets its contents to the `&str`'s contents. Both types are UTF-8,
+/// so no conversion is necessary; we can just use the `&str` as-is.
+/// Returns a pointer to the NSString.
+pub fn str_to_nsstring(string: &str) -> *mut c_void {
+    let (nsstring, alloc, init) = VTables::with(|vtables| {
+        (
+            vtables.nsstring.class,
+            vtables.nsstring.alloc,
+            vtables.nsstring.init_with_bytes_length_encoding_sel,
+        )
+    });
+
+    let nsstring = msg_ret![nsstring alloc];
+    let bytes = string.as_ptr();
+    let length = string.len();
+    let encoding = NSStringEncoding::UTF8;
+
+    msg_ret![nsstring init initWithBytes:bytes length:length encoding:encoding]
+}

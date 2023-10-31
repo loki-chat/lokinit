@@ -1,24 +1,24 @@
 #[macro_export]
 macro_rules! cstring {
     ($str:literal) => {
-        concat!($str, '\0').as_ptr() as *const std::ffi::c_char
+        concat!($str, '\0').as_ptr() as *const core::ffi::c_char
     };
     ($($str:tt)*) => {
-        concat!(stringify!($($str)*), '\0').as_ptr() as *const std::ffi::c_char
+        concat!(stringify!($($str)*), '\0').as_ptr() as *const core::ffi::c_char
     };
 }
 
 #[macro_export]
 macro_rules! class {
     ($name:ident) => {
-        unsafe { ffi::objc_getClass(cstring!($name)) }
+        unsafe { $crate::native::macos::objc::ffi::objc_getClass(cstring!($name)) }
     };
 }
 
 #[macro_export]
 macro_rules! sel {
     ($name:literal) => {
-        unsafe { ffi::sel_getUid(cstring!($name)) }
+        unsafe { $crate::native::macos::objc::ffi::sel_getUid(cstring!($name)) }
     };
 }
 
@@ -28,14 +28,23 @@ macro_rules! msg {
     ($class:ident $sel:ident) => {
         unsafe {
             #[allow(unused_unsafe)]
-            let func: extern "C" fn(instance: *mut c_void, msg: *mut c_void) = std::mem::transmute(ffi::objc_msgSend as *const c_void);
+            let func: extern "C" fn(
+                instance: *mut core::ffi::c_void, msg: *mut core::ffi::c_void
+            ) = std::mem::transmute(
+                $crate::native::macos::objc::ffi::objc_msgSend as *const c_void
+            );
             func($class, $sel);
         }
     };
     ($class:ident $sel:ident $($arg_name:ident:$arg:expr)*) => {
         unsafe {
             #[allow(unused_unsafe)]
-            let func: extern "C" fn(instance: *mut c_void, msg: *mut c_void$(, $arg_name: _)*) = std::mem::transmute(ffi::objc_msgSend as *const c_void);
+            let func: extern "C" fn(
+                instance: *mut core::ffi::c_void, msg: *mut core::ffi::c_void$(, $arg_name: _)*
+            ) =
+                std::mem::transmute(
+                    $crate::native::macos::objc::ffi::objc_msgSend as *const core::ffi::c_void
+                );
             func($class, $sel, $($arg,)*);
         }
     };
@@ -47,15 +56,22 @@ macro_rules! msg_ret {
     ($class:ident $sel:ident) => {
         unsafe {
             #[allow(unused_unsafe)]
-            let func: extern "C" fn(instance: *mut c_void, msg: *mut c_void) -> _ =
-                std::mem::transmute(ffi::objc_msgSend as *const c_void);
+            let func: extern "C" fn(instance: *mut core::ffi::c_void, msg: *mut core::ffi::c_void) -> _ =
+                std::mem::transmute(
+                    $crate::native::macos::objc::ffi::objc_msgSend as *const core::ffi::c_void
+                );
             func($class, $sel)
         }
     };
     ($class:ident $sel:ident $($arg_name:ident:$arg:expr)*) => {
         unsafe {
             #[allow(unused_unsafe)]
-            let func: extern "C" fn(instance: *mut c_void, msg: *mut c_void$(, $arg_name: _)*) -> _ = std::mem::transmute(ffi::objc_msgSend as *const c_void);
+            let func: extern "C" fn(
+                instance: *mut core::ffi::c_void, msg: *mut core::ffi::c_void$(, $arg_name: _)*
+            ) -> _ =
+                core::mem::transmute(
+                    $crate::native::macos::objc::ffi::objc_msgSend as *const core::ffi::c_void
+            );
             func($class, $sel, $($arg,)*)
         }
     };
