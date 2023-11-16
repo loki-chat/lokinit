@@ -17,25 +17,6 @@ pub struct VTables {
     pub nsimage: NSImageVTable,
     pub nsbutton: NSButtonVTable,
 }
-impl VTables {
-    /// Wraps around `VTABLES.with` and auto-unwraps the OnceCell. This is purely to remove some
-    /// annoying boilerplate.
-    #[inline]
-    pub fn with<R, F: Fn(&Self) -> R>(func: F) -> R {
-        VTABLES.with(|vtables| func(vtables.get().unwrap()))
-    }
-
-    /// Loads all the VTables. This is called in `lok::init()`, and must be called before any
-    /// Lokinit code actually runs, because the macOS code will unwrap the VTables and assume
-    /// it's loaded.
-    pub fn init() {
-        VTABLES.with(|vtables| vtables.set(VTables::default()).unwrap());
-    }
-}
-
-thread_local! {
-    pub static VTABLES: OnceCell<VTables> = OnceCell::new();
-}
 
 /// A VTable for the NSApplication class.
 #[derive(Debug)]
@@ -105,6 +86,8 @@ pub struct NSWindowVTable {
     pub set_frame_sel: *mut c_void,
     /// https://developer.apple.com/documentation/appkit/nswindow/1419491-standardwindowbutton?language=objc
     pub std_window_btn_sel: *mut c_void,
+    /// https://developer.apple.com/documentation/appkit/nswindow/1419639-disablecursorrects?language=objc
+    pub disable_cursor_rects_sel: *mut c_void,
 }
 impl Default for NSWindowVTable {
     fn default() -> Self {
@@ -120,6 +103,7 @@ impl Default for NSWindowVTable {
             frame_sel: sel!("frame"),
             set_frame_sel: sel!("setFrame:display:"),
             std_window_btn_sel: sel!("standardWindowButton:"),
+            disable_cursor_rects_sel: sel!("disableCursorRects"),
         }
     }
 }
@@ -232,6 +216,8 @@ pub struct NSEventVTable {
     pub window_number_sel: *mut c_void,
     /// The [NSEvent mouseLocation] message.
     pub mouse_location_sel: *mut c_void,
+    /// https://developer.apple.com/documentation/appkit/nsevent/1527828-buttonnumber?language=objc
+    pub button_number_sel: *mut c_void,
 }
 impl Default for NSEventVTable {
     fn default() -> Self {
@@ -241,6 +227,7 @@ impl Default for NSEventVTable {
             subtype_sel: sel!("subtype"),
             window_number_sel: sel!("windowNumber"),
             mouse_location_sel: sel!("mouseLocation"),
+            button_number_sel: sel!("buttonNumber"),
         }
     }
 }

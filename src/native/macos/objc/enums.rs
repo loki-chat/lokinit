@@ -66,7 +66,7 @@ pub enum NSApplicationActivationPolicy {
 
 /// https://developer.apple.com/documentation/appkit/nseventtype?language=objc
 #[repr(usize)]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum NSEventType {
     LeftMouseDown = 1,
     LeftMouseUp = 2,

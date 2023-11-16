@@ -50,58 +50,8 @@ pub mod macros;
 pub mod vtables;
 
 use {
-    crate::event::*,
-    cursor::{Cursors, MacOsCursor},
-    enums::*,
-    macros::*,
-    std::ffi::c_void,
-    vtables::VTables,
+    crate::event::*, cursor::MacOsCursor, enums::*, macros::*, std::ffi::c_void, vtables::VTables,
 };
-
-/// A wrapper around the NSApplication class.
-///
-/// In usual Swift code, you initialize the NSApplication class, and then use the global NSApp
-/// variable to interact with that instance. This provides an almost identical API by using an
-/// empty struct. The pointer to that NSApplication instance is stored in the `nsapp` vtable.
-pub struct NSApp;
-impl NSApp {
-    /// We have to tell NSApplication to launch and configure a few things before we can use it.
-    /// This method takes care of that.
-    pub fn load(&self) {
-        let (instance, set_activation_policy, activate, finish_launching) =
-            VTables::with(|vtables| {
-                (
-                    vtables.nsapp.shared,
-                    vtables.nsapp.set_activation_policy_sel,
-                    vtables.nsapp.activate_ignoring_other_apps_sel,
-                    vtables.nsapp.finish_launching_sel,
-                )
-            });
-
-        let activation_policy = NSApplicationActivationPolicy::Regular as usize;
-
-        msg![instance set_activation_policy setActivationPolicy:activation_policy];
-        msg![instance activate activateIgnoringOtherApps:true];
-        msg![instance finish_launching];
-    }
-
-    /// Calls [NSApp nextEventMatchingMask:...], then creates an NSEvent struct around that.
-    pub fn next_event(&self) -> NSEvent {
-        let (nsapp, next_event, distant_future) = VTables::with(|vtables| {
-            (
-                vtables.nsapp.shared,
-                vtables.nsapp.next_event_matching_sel,
-                vtables.nsdate.distant_future,
-            )
-        });
-        // Matches all NSEvent masks
-        let mask = usize::MAX;
-        let mode = unsafe { ffi::NSDefaultRunLoopMode };
-
-        let ptr = msg_ret![nsapp next_event nextEventMatchingMask:mask untilDate:distant_future inMode:mode dequeue:true];
-        NSEvent { ptr }
-    }
-}
 
 #[derive(Clone, Copy)]
 pub enum NSWindowBorder {
@@ -150,20 +100,23 @@ pub struct NSWindow {
 impl NSWindow {
     const BORDER_SIZE: f64 = 7.;
 
-    pub fn new(rect: NSRect, centered: bool, name: &str, backend: &mut MacosBackend) -> Self {
-        let (nswindow, alloc, init, id, set_title, center, nsscreen, main_screen) =
-            VTables::with(|vtables| {
-                (
-                    vtables.nswindow.class,
-                    vtables.nswindow.alloc_sel,
-                    vtables.nswindow.constructor_sel,
-                    vtables.nswindow.window_number_sel,
-                    vtables.nswindow.set_title_sel,
-                    vtables.nswindow.center_sel,
-                    vtables.nsscreen.class,
-                    vtables.nsscreen.main_screen_sel,
-                )
-            });
+    /// Creates a new window & stores it in the backend.
+    pub fn new_in_backend(
+        rect: NSRect,
+        centered: bool,
+        name: &str,
+        backend: &mut MacosBackend,
+    ) -> usize {
+        let (nswindow, alloc, init, id, set_title, center, nsscreen, main_screen) = (
+            backend.vtables.nswindow.class,
+            backend.vtables.nswindow.alloc_sel,
+            backend.vtables.nswindow.constructor_sel,
+            backend.vtables.nswindow.window_number_sel,
+            backend.vtables.nswindow.set_title_sel,
+            backend.vtables.nswindow.center_sel,
+            backend.vtables.nsscreen.class,
+            backend.vtables.nsscreen.main_screen_sel,
+        );
 
         let backing: usize = NSBackingStoreType::Buffered as usize;
         let mask: usize = (NSWindowStyleMask::Titled
@@ -177,7 +130,7 @@ impl NSWindow {
         let rect_clone = rect.clone();
         msg![instance init initWithContentRect:rect_clone styleMask:mask backing:backing defer:false screen:screen];
 
-        let title = str_to_nsstring(name);
+        let title = str_to_nsstring(name, &backend.vtables);
         msg![instance set_title setTitle:title];
 
         if centered {
@@ -206,39 +159,23 @@ impl NSWindow {
             resize_direction: None,
             hover_border: None,
         };
-        this.recalculate_window_rect();
-        this.make_main();
-        backend.frontmost_window = Some(id);
 
-        this
-    }
+        this.recalculate_window_rect(&backend.vtables);
+        backend.windows.insert(id, this);
+        backend.set_frontmost_window(id);
 
-    /// Makes the window the frontmost window.
-    ///
-    /// Note: This does *not* set `MacosBackend::frontmost_window`. That must be set separately.
-    pub fn make_main(&self) {
-        let instance = self.ptr;
-        let sender: *mut c_void = std::ptr::null_mut();
-        let (make_key_and_order_front, make_main) = VTables::with(|vtables| {
-            (
-                vtables.nswindow.make_key_and_order_front_sel,
-                vtables.nswindow.make_main_window_sel,
-            )
-        });
-
-        msg![instance make_key_and_order_front makeKeyAndOrderFront:sender];
-        msg![instance make_main];
+        id
     }
 
     /// Update location, size, and border locations
-    pub fn recalculate_window_rect(&mut self) {
-        let frame = VTables::with(|vtables| vtables.nswindow.frame_sel);
+    pub fn recalculate_window_rect(&mut self, vtables: &VTables) {
+        let frame = vtables.nswindow.frame_sel;
         let instance = self.ptr;
         self.rect = msg_ret![instance frame];
-        self.recalculate_window_borders();
+        self.recalculate_window_borders(vtables);
     }
 
-    pub fn recalculate_window_borders(&mut self) {
+    pub fn recalculate_window_borders(&mut self, vtables: &VTables) {
         let width = self.rect.size.width;
         let height = self.rect.size.height;
 
@@ -282,13 +219,11 @@ impl NSWindow {
         self.bottom_right_mouse_border.size.width = Self::BORDER_SIZE;
         self.bottom_right_mouse_border.size.height = Self::BORDER_SIZE;
 
-        let (std_window_btn, superview, frame) = VTables::with(|vtables| {
-            (
-                vtables.nswindow.std_window_btn_sel,
-                vtables.nsbutton.superview_sel,
-                vtables.nswindow.frame_sel,
-            )
-        });
+        let (std_window_btn, superview, frame) = (
+            vtables.nswindow.std_window_btn_sel,
+            vtables.nsbutton.superview_sel,
+            vtables.nswindow.frame_sel,
+        );
 
         let instance = self.ptr;
         let close_btn = NSWindowButton::Close;
@@ -303,7 +238,6 @@ impl NSWindow {
         let close_btn: NSRect = msg_ret![close_btn frame];
         let zoom_btn: NSRect = msg_ret![zoom_btn frame];
         let titlebar: NSRect = msg_ret![titlebar frame];
-        println!("zoom btn: {zoom_btn:?}");
 
         self.stoplight_buttons_rect = NSRect::new(
             close_btn.origin.x + titlebar.origin.x,
@@ -370,8 +304,8 @@ impl NSWindow {
     }
 
     /// Sets the underlying NSWindow's size to our size.
-    pub fn apply_size(&self) {
-        let set_frame = VTables::with(|vtables| vtables.nswindow.set_frame_sel);
+    pub fn apply_size(&self, vtables: &VTables) {
+        let set_frame = vtables.nswindow.set_frame_sel;
         let instance = self.ptr;
         let frame = self.rect.clone();
 
@@ -382,14 +316,6 @@ impl NSWindow {
 #[derive(Debug)]
 pub struct NSEvent {
     pub ptr: *mut c_void,
-}
-impl NSEvent {
-    pub fn event_subtype(&self) -> NSEventSubtype {
-        let event_subtype = VTables::with(|vtables| vtables.nsevent.subtype_sel);
-        let instance = self.ptr;
-
-        msg_ret![instance event_subtype]
-    }
 }
 
 #[repr(C)]
@@ -430,14 +356,12 @@ impl NSRect {
 /// Allocates an new NSString, then sets its contents to the `&str`'s contents. Both types are UTF-8,
 /// so no conversion is necessary; we can just use the `&str` as-is.
 /// Returns a pointer to the NSString.
-pub fn str_to_nsstring(string: &str) -> *mut c_void {
-    let (nsstring, alloc, init) = VTables::with(|vtables| {
-        (
-            vtables.nsstring.class,
-            vtables.nsstring.alloc,
-            vtables.nsstring.init_with_bytes_length_encoding_sel,
-        )
-    });
+pub fn str_to_nsstring(string: &str, vtables: &VTables) -> *mut c_void {
+    let (nsstring, alloc, init) = (
+        vtables.nsstring.class,
+        vtables.nsstring.alloc,
+        vtables.nsstring.init_with_bytes_length_encoding_sel,
+    );
 
     let nsstring = msg_ret![nsstring alloc];
     let bytes = string.as_ptr();

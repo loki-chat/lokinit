@@ -10,7 +10,10 @@ use {
         lok::{CreateWindowError, LokinitBackend},
         window::{WindowBuilder, WindowHandle},
     },
-    objc::{cursor, macros::*, vtables::VTables, NSApp, NSRect, NSWindow},
+    objc::{
+        cursor, cursor::MacOsCursor, enums::NSApplicationActivationPolicy, macros::*,
+        vtables::VTables, NSEvent, NSRect, NSWindow,
+    },
     std::{collections::HashMap, collections::VecDeque, ffi::c_void},
 };
 
@@ -23,6 +26,12 @@ pub struct MacosBackend {
     /// 2 events. For example, switching windows triggers both a `FocusIn` event for the newly main
     /// window and a `FocusOut` event for the formerly main window.
     pub event_queue: VecDeque<Event>,
+    /// Selector and class pointers for Objective-C bindings.
+    pub vtables: VTables,
+    /// Pointers to the macOS cursor classes.
+    pub cursors: HashMap<MacOsCursor, *mut c_void>,
+    /// If a window is resizing.
+    pub in_resize: bool,
 }
 
 impl MacosBackend {
@@ -64,27 +73,66 @@ impl MacosBackend {
         let new_window = self.windows.get_mut(&new_window_id).unwrap();
         let instance = new_window.ptr;
         let sender: *mut c_void = std::ptr::null_mut();
-        let (make_key_and_order_front, make_main) = VTables::with(|vtables| {
-            (
-                vtables.nswindow.make_key_and_order_front_sel,
-                vtables.nswindow.make_main_window_sel,
-            )
-        });
+        let (make_key_and_order_front, make_main) = (
+            self.vtables.nswindow.make_key_and_order_front_sel,
+            self.vtables.nswindow.make_main_window_sel,
+        );
         msg![instance make_key_and_order_front makeKeyAndOrderFront:sender];
         msg![instance make_main];
+    }
+
+    /// Waits until the next NSEvent is sent to the app, then returns it.
+    pub fn wait_on_next_nsevent(&self) -> NSEvent {
+        let (nsapp, next_event, distant_future) = (
+            self.vtables.nsapp.shared,
+            self.vtables.nsapp.next_event_matching_sel,
+            self.vtables.nsdate.distant_future,
+        );
+        // Matches all NSEvent masks
+        let mask = usize::MAX;
+        let mode = unsafe { objc::ffi::NSDefaultRunLoopMode };
+
+        let ptr = msg_ret![nsapp next_event nextEventMatchingMask:mask untilDate:distant_future inMode:mode dequeue:true];
+        NSEvent { ptr }
+    }
+
+    /// Change the active cursor.
+    pub fn set_cursor(&self, cursor: MacOsCursor) {
+        if self.in_resize {
+            return;
+        }
+
+        let set = self.vtables.nscursor.set_sel;
+        let ptr = self.cursors.get(&cursor).unwrap().to_owned();
+        msg![ptr set];
     }
 }
 
 impl LokinitBackend for MacosBackend {
     fn init() -> Self {
-        VTables::init();
-        cursor::load_cursors();
-        NSApp.load();
+        let vtables = VTables::default();
+        let cursors = cursor::load_cursors(&vtables);
+
+        let (instance, set_activation_policy, activate, finish_launching) = (
+            vtables.nsapp.shared,
+            vtables.nsapp.set_activation_policy_sel,
+            vtables.nsapp.activate_ignoring_other_apps_sel,
+            vtables.nsapp.finish_launching_sel,
+        );
+
+        let activation_policy = NSApplicationActivationPolicy::Regular as usize;
+
+        msg![instance set_activation_policy setActivationPolicy:activation_policy];
+        msg![instance activate activateIgnoringOtherApps:true];
+        msg![instance finish_launching];
 
         Self {
             windows: HashMap::new(),
             frontmost_window: None,
             event_queue: VecDeque::new(),
+            vtables,
+            cursors,
+            in_resize: false,
         }
     }
 
@@ -95,14 +143,13 @@ impl LokinitBackend for MacosBackend {
             builder.size.width as f64,
             builder.size.height as f64,
         );
-        let window = NSWindow::new(rect, builder.centered, &builder.title, self);
-        let id = window.id;
-        self.windows.insert(id, window);
+        let id = NSWindow::new_in_backend(rect, builder.centered, &builder.title, self);
 
         Ok(WindowHandle(id))
     }
 
-    fn close_window(&mut self, handle: WindowHandle) {
+    fn close_window(&mut self, _handle: WindowHandle) {
+        // Note to self: Will also need to unset frontmost_window if it's this window
         todo!("Window closing support")
     }
 
@@ -113,9 +160,9 @@ impl LokinitBackend for MacosBackend {
         }
 
         loop {
-            let event = NSApp.next_event();
+            let event = self.wait_on_next_nsevent();
 
-            if let Some(event) = NSApp.handle(event, self) {
+            if let Some(event) = self.handle(event) {
                 return Some(event);
             }
         }
