@@ -304,44 +304,30 @@ impl MacosBackend {
                 })
             }
 
-            NSEventType::OtherMouseDown => {
+            e @ (NSEventType::OtherMouseDown | NSEventType::OtherMouseUp) => {
                 let window = self.windows.get(&window_id).unwrap();
+                let ptr = event.ptr;
                 let mouse_pos: NSPoint = msg_ret![nsevent mouse_pos];
-                let mouse_btn: isize = msg_ret![nsevent mouse_btn];
+                let mouse_btn: isize = msg_ret![ptr mouse_btn];
                 let NSPoint { x, y } = window.screen_point_to_local_point(mouse_pos);
-
                 change_frontmost_window = true;
+
+                let btn = if mouse_btn == 2 {
+                    MouseButton::Middle
+                } else {
+                    MouseButton::Other(mouse_btn as u16)
+                };
+
+                let event = match e {
+                    NSEventType::OtherMouseDown => MouseEvent::ButtonPress(btn, x as i32, y as i32),
+                    NSEventType::OtherMouseUp => MouseEvent::ButtonRelease(btn, x as i32, y as i32),
+                    _ => unreachable!(),
+                };
 
                 Some(Event {
                     time: Duration::ZERO,
                     window: WindowHandle(window_id),
-                    kind: EventKind::Mouse(MouseEvent::ButtonPress(
-                        // TODO: One of the mouse button numbers is for the middle mouse button, need to figure out
-                        // which, and use MouseButton::Middle for it instead of Other.
-                        MouseButton::Other(mouse_btn as u16),
-                        x as i32,
-                        y as i32,
-                    )),
-                })
-            }
-            NSEventType::OtherMouseUp => {
-                let window = self.windows.get(&window_id).unwrap();
-                let mouse_pos: NSPoint = msg_ret![nsevent mouse_pos];
-                let mouse_btn: isize = msg_ret![nsevent mouse_btn];
-                let NSPoint { x, y } = window.screen_point_to_local_point(mouse_pos);
-
-                change_frontmost_window = true;
-
-                Some(Event {
-                    time: Duration::ZERO,
-                    window: WindowHandle(window_id),
-                    kind: EventKind::Mouse(MouseEvent::ButtonRelease(
-                        // TODO: One of the mouse button numbers is for the middle mouse button, need to figure out
-                        // which, and use MouseButton::Middle for it instead of Other.
-                        MouseButton::Other(mouse_btn as u16),
-                        x as i32,
-                        y as i32,
-                    )),
+                    kind: EventKind::Mouse(event),
                 })
             }
 
@@ -353,12 +339,28 @@ impl MacosBackend {
             NSEventType::MouseEntered => {
                 // let event = event.ptr;
                 // msg![nsapp send_event sendEvent:event];
-                None
+                let window = self.windows.get(&window_id).unwrap();
+                let mouse_pos: NSPoint = msg_ret![nsevent mouse_pos];
+                let NSPoint { x, y } = window.screen_point_to_local_point(mouse_pos);
+
+                Some(Event {
+                    time: Duration::ZERO,
+                    window: WindowHandle(window_id),
+                    kind: EventKind::Mouse(MouseEvent::CursorIn(x as i32, y as i32)),
+                })
             }
             NSEventType::MouseExited => {
                 // let event = event.ptr;
                 // msg![nsapp send_event sendEvent:event];
-                None
+                let window = self.windows.get(&window_id).unwrap();
+                let mouse_pos: NSPoint = msg_ret![nsevent mouse_pos];
+                let NSPoint { x, y } = window.screen_point_to_local_point(mouse_pos);
+
+                Some(Event {
+                    time: Duration::ZERO,
+                    window: WindowHandle(window_id),
+                    kind: EventKind::Mouse(MouseEvent::CursorOut(x as i32, y as i32)),
+                })
             }
 
             e @ (NSEventType::KeyDown | NSEventType::KeyUp) => {
