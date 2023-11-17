@@ -1,7 +1,4 @@
-use {
-    super::{macros::*, *},
-    std::{cell::OnceCell, ffi::c_void},
-};
+use {super::macros::*, std::ffi::c_void};
 
 /// Pointers to the classes and selectors Lokinit needs.
 #[derive(Default, Debug)]
@@ -88,6 +85,8 @@ pub struct NSWindowVTable {
     pub std_window_btn_sel: *mut c_void,
     /// https://developer.apple.com/documentation/appkit/nswindow/1419639-disablecursorrects?language=objc
     pub disable_cursor_rects_sel: *mut c_void,
+    /// https://developer.apple.com/documentation/appkit/nswindow/1419662-close?language=objc
+    pub close_sel: *mut c_void,
 }
 impl Default for NSWindowVTable {
     fn default() -> Self {
@@ -104,6 +103,7 @@ impl Default for NSWindowVTable {
             set_frame_sel: sel!("setFrame:display:"),
             std_window_btn_sel: sel!("standardWindowButton:"),
             disable_cursor_rects_sel: sel!("disableCursorRects"),
+            close_sel: sel!("close"),
         }
     }
 }

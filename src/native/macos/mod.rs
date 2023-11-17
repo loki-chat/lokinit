@@ -2,11 +2,10 @@ mod bplist;
 mod keysym;
 mod objc;
 
-use crate::event::EventKind;
-use std::time::Duration;
 use {
     crate::{
-        event::Event,
+        event::{Event, EventKind},
+        keycode::KeyCode,
         lok::{CreateWindowError, LokinitBackend},
         window::{WindowBuilder, WindowHandle},
     },
@@ -14,7 +13,7 @@ use {
         cursor, cursor::MacOsCursor, enums::NSApplicationActivationPolicy, macros::*,
         vtables::VTables, NSEvent, NSRect, NSWindow,
     },
-    std::{collections::HashMap, collections::VecDeque, ffi::c_void},
+    std::{collections::HashMap, collections::VecDeque, ffi::c_void, time::Duration},
 };
 
 pub struct MacosBackend {
@@ -32,6 +31,8 @@ pub struct MacosBackend {
     pub cursors: HashMap<MacOsCursor, *mut c_void>,
     /// If a window is resizing.
     pub in_resize: bool,
+    /// The previously pressed key - used for `RepeatKey` events.
+    pub last_key: Option<KeyCode>,
 }
 
 impl MacosBackend {
@@ -133,6 +134,7 @@ impl LokinitBackend for MacosBackend {
             vtables,
             cursors,
             in_resize: false,
+            last_key: None,
         }
     }
 
@@ -148,9 +150,21 @@ impl LokinitBackend for MacosBackend {
         Ok(WindowHandle(id))
     }
 
-    fn close_window(&mut self, _handle: WindowHandle) {
-        // Note to self: Will also need to unset frontmost_window if it's this window
-        todo!("Window closing support")
+    fn close_window(&mut self, handle: WindowHandle) {
+        let window_id = handle.0;
+        let Some(window) = self.windows.get(&window_id) else {
+            return;
+        };
+
+        let close = self.vtables.nswindow.close_sel;
+        let ptr = window.ptr;
+        msg![ptr close];
+        self.windows.remove(&window_id);
+
+        if self.frontmost_window == Some(window_id) {
+            // TODO: Should we make a different window main?
+            self.frontmost_window = None;
+        }
     }
 
     fn poll_event(&mut self) -> Option<Event> {

@@ -370,8 +370,18 @@ impl MacosBackend {
 
                 let keycode = super::super::keysym::to_keycode(keycode)?;
                 let key_event = match e {
-                    NSEventType::KeyDown => KeyboardEvent::KeyPress(keycode),
-                    NSEventType::KeyUp => KeyboardEvent::KeyRelease(keycode),
+                    NSEventType::KeyDown => {
+                        if self.last_key == Some(keycode) {
+                            KeyboardEvent::KeyRepeat(keycode)
+                        } else {
+                            self.last_key = Some(keycode);
+                            KeyboardEvent::KeyPress(keycode)
+                        }
+                    }
+                    NSEventType::KeyUp => {
+                        self.last_key = None;
+                        KeyboardEvent::KeyRelease(keycode)
+                    }
                     _ => unreachable!(),
                 };
 
