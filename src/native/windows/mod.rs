@@ -27,6 +27,25 @@ pub struct WindowsBackend {
     window_title_size: i32,
 }
 
+impl TryFrom<isize> for WindowBorder {
+    fn try_from(ht: isize) -> Result<WindowBorder, ()> {
+        match ht {
+            HTTOP => Ok(WindowBorder::Top ),
+            HTTOPRIGHT => Ok(WindowBorder::TopRight),
+            HTRIGHT => Ok(WindowBorder::Right),
+            HTBOTTOMRIGHT => Ok(WindowBorder::BottomRight),
+            HTBOTTOM => Ok(WindowBorder::Bottom),
+            HTBOTTOMLEFT => Ok(WindowBorder::BottomLeft),
+            HTLEFT => Ok(WindowBorder::Left),
+            HTTOPLEFT => Ok(WindowBorder::Left),
+            _ => Err(())
+        }
+    }
+
+    type Error = ();
+
+}
+
 impl LokinitBackend for WindowsBackend {
     fn init() -> Self {
         Self {  

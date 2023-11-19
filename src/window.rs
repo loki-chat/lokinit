@@ -41,24 +41,6 @@ pub enum WindowBorder {
     BottomRight,
 }
 
-impl TryFrom<isize> for WindowBorder {
-    fn try_from(ht: isize) -> Result<WindowBorder, ()> {
-        match ht {
-            HTTOP => Ok(WindowBorder::Top ),
-            HTTOPRIGHT => Ok(WindowBorder::TopRight),
-            HTRIGHT => Ok(WindowBorder::Right),
-            HTBOTTOMRIGHT => Ok(WindowBorder::BottomRight),
-            HTBOTTOM => Ok(WindowBorder::Bottom),
-            HTBOTTOMLEFT => Ok(WindowBorder::BottomLeft),
-            HTLEFT => Ok(WindowBorder::Left),
-            HTTOPLEFT => Ok(WindowBorder::Left),
-            _ => Err(())
-        }
-    }
-
-    type Error = ();
-
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub enum ScreenMode {
