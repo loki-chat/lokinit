@@ -197,6 +197,10 @@ impl LokinitBackend for WindowsBackend {
         }
     }
 
+    fn set_screen_mode(&mut self, handle: WindowHandle, screen_mode: ScreenMode) {
+        todo!()
+    }
+
     fn close_window(&mut self, handle: WindowHandle) {
         self.window_handles.remove(&handle);
         println!("Remaining windows: {}", self.window_handles.len());
