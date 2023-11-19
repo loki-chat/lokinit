@@ -1,4 +1,5 @@
 use lokinit::prelude::*;
+use lokinit::window::ScreenMode;
 
 fn main() {
     // hehe
@@ -45,15 +46,29 @@ fn main() {
                 // Log spam warning: it's commented for a reason
                 // MouseEvent::CursorMove(x, y) => println!("Cursor moved to ({x}, {y})"),
                 _ => {}
-            }
+            },
             EventKind::Keyboard(event) => match event {
-                KeyboardEvent::KeyPress(keycode) => println!("[{win:?}] Key {keycode:?} pressed"),
+                KeyboardEvent::KeyPress(keycode) => {
+                    println!("[{win:?}] Key {keycode:?} pressed");
+
+                    match keycode {
+                        KeyCode::F => {
+                            println!("[{win:?}] FULLSCREEN");
+                            lok::set_screen_mode(win, ScreenMode::Fullscreen);
+                        }
+                        KeyCode::W => {
+                            println!("[{win:?}] WINDOWED");
+                            lok::set_screen_mode(win, ScreenMode::Windowed);
+                        }
+                        _ => (),
+                    }
+                }
                 KeyboardEvent::KeyRelease(keycode) => {
                     println!("[{win:?}] Key {keycode:?} released")
                 }
                 KeyboardEvent::KeyRepeat(keycode) => println!("[{win:?}] Key {keycode:?} repeated"),
                 KeyboardEvent::ImeCommit(commit) => println!("[{win:?}] IME commit -> {commit:?}"),
-            }
+            },
             EventKind::Resized(width, height) => {
                 println!("[{win:?}] Window resized to ({width}, {height})")
             }
@@ -64,6 +79,11 @@ fn main() {
                 lok::close_window(win);
                 println!("[{win:?}] Closed upon request");
             }
+            EventKind::Destroyed => {
+                println!("[{win:?}] Destroyed")
+            }
+            EventKind::FocusIn => println!("[{win:?}] Window focused"),
+            EventKind::FocusOut => println!("[{win:?}] Window lost focus"),
             _ => {}
         }
     }

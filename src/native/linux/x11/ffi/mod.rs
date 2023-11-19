@@ -1,4 +1,4 @@
-#![allow(non_snake_case)]
+#![allow(non_snake_case, clippy::upper_case_acronyms)]
 
 use std::ffi::{c_char, c_int, c_long, c_short, c_uint, c_ulong, c_void};
 
@@ -26,7 +26,7 @@ pub type KeySym = XID;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct XWindow(c_ulong);
+pub struct XWindow(pub(crate) c_ulong);
 
 impl XWindow {
     pub const NONE: Self = XWindow(0);
@@ -35,7 +35,7 @@ impl XWindow {
         self.0
     }
 
-    pub unsafe fn into_window_handle(&self) -> WindowHandle {
+    pub unsafe fn into_window_handle(self) -> WindowHandle {
         WindowHandle(self.0 as usize)
     }
 }
@@ -334,6 +334,13 @@ library! {
 
     pub fn XPending(display: *mut XDisplay) -> c_int;
     pub fn XNextEvent(display: *mut XDisplay, event: *mut XEvent) -> c_int;
+    pub fn XSendEvent(
+        display: *mut XDisplay,
+        window: XWindow,
+        propagate: c_int,
+        event_mask: c_long,
+        event_send: *mut XEvent,
+    ) -> c_int;
 
     // XKB
 
