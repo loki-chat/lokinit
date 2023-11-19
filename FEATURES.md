@@ -14,20 +14,20 @@ Legend:
 | Feature                  | Windows | MacOS   | Linux X11 | Linux Wayland | Android | iOS     |
 | ------------------------ | ------- | ------- | --------- | ------------- | ------- | ------- |
 | Window initialization    | ❌       | ✔️       | ✔️         | ❌             | ❌       | ❌       |
-| Multiple windows         | ❌       | ❌       | ✔️         | ❌             | ❌       | ❌       |
+| Multiple windows         | ❌       | ✔️       | ✔️         | ❌             | ❌       | ❌       |
 | OpenGL support           | ❌       | ❌       | ❌         | ❌             | ❌       | ❌       |
 | Vulkan support           | ❌       | ❌       | ❌         | ❌             | ❌       | ❌       |
 | DirectX support          | ❌       | **N/A** | **N/A**   | **N/A**       | **N/A** | **N/A** |
 | Metal support            | **N/A** | ❌       | **N/A**   | **N/A**       | **N/A** | ❌       |
 | Window decorations       | ❌       | ❌       | ❌         | ❌             | **N/A** | **N/A** |
-| Window resizing          | ❌       | ❓       | ✔️         | ❌             | **N/A** | **N/A** |
+| Window resizing          | ❌       | ✔️       | ✔️         | ❌             | **N/A** | **N/A** |
 | Window resize increments | ❌       | ❌       | ❌         | ❌             | **N/A** | **N/A** |
 | Window transparency      | ❌       | ❌       | ❌         | ❌             | **N/A** | **N/A** |
 | Window maximization      | ❌       | ❌       | ❌         | ❌             | **N/A** | **N/A** |
 | Window minimization      | ❌       | ❌       | ❌         | ❌             | **N/A** | **N/A** |
 | Fullscreen               | ❌       | ❌       | ❌         | ❌             | **N/A** | ❌       |
 | Exclusive fullscreen     | ❌       | ❌       | ❌         | **N/A**       | ❌       | ❌       |
-| HiDPI support            | ❌       | ❌       | ❌         | ❌             | ❌       | ❌       |
+| HiDPI support            | ❌       | ✔️       | ❌         | ❌             | ❌       | ❌       |
 | Popup windows            | ❌       | ❌       | ❌         | ❌             | ❌       | ❌       |
 
 ## System information
@@ -50,10 +50,10 @@ Legend:
 | Touch events            | ❌       | ❌     | ❌         | ❌             | ❌       | ❌       |
 | Touch pressure          | ❌       | ❌     | ❌         | ❌             | ❌       | ❌       |
 | Multitouch              | ❌       | ❌     | ❌         | ❌             | ❌       | ❌       |
-| Keyboard events         | ❌       | ❌     | ✔️         | ❌             | ❌       | ❌       |
+| Keyboard events         | ❌       | ✔️     | ✔️         | ❌             | ❌       | ❌       |
 | Drag & Drop             | ❌       | ❌     | ❌         | ❌             | **N/A** | **N/A** |
 | Raw Device Events       | ❌       | ❌     | ❌         | ❌             | ❌       | ❌       |
 | Gamepad/Joystick events | ❌       | ❌     | ❌         | ❌             | ❌       | ❌       |
 | Device movement events  | ❌       | ❌     | ❌         | ❌             | ❌       | ❌       |
 | Drag window with cursor | ❌       | ✔️     | ✔️         | ❌             | **N/A** | **N/A** |
-| Resize with cursor      | ❌       | ❓     | ✔️         | ❌             | **N/A** | **N/A** |
+| Resize with cursor      | ❌       | ✔️     | ✔️         | ❌             | **N/A** | **N/A** |
