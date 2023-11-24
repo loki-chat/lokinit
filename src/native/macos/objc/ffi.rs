@@ -1,4 +1,4 @@
-use std::ffi::{c_char, c_void};
+use std::ffi::{c_char, c_int, c_void};
 
 #[link(name = "objc")]
 extern "C" {
@@ -7,7 +7,6 @@ extern "C" {
     pub fn objc_msgSend(instance: *mut c_void, msg: *mut c_void) -> *mut c_void;
     pub fn objc_getClass(name: *const c_char) -> *mut c_void;
     pub fn sel_getUid(name: *const c_char) -> *mut c_void;
-    pub fn class_getClassVariable(class: *mut c_void, name: *const c_char) -> *mut c_void;
 }
 
 #[link(name = "Foundation", kind = "framework")]
@@ -23,3 +22,14 @@ extern "C" {
 // It just returns null, and if you send a message to that class, it fails silently.
 #[link(name = "AppKit", kind = "framework")]
 extern "C" {}
+
+#[cfg(feature = "opengl")]
+extern "C" {
+    pub fn dlopen(filename: *const c_char, flag: c_int) -> *mut c_void;
+    pub fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
+    pub fn CFBundleGetBundleWithIdentifier(bundleID: *const c_void) -> *const c_void;
+    pub fn CFBundleGetFunctionPointerForName(
+        bundle: *const c_void,
+        functionName: *const c_void,
+    ) -> *const c_void;
+}

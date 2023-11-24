@@ -1,7 +1,11 @@
 mod bplist;
 mod keysym;
 mod objc;
+#[cfg(feature = "opengl")]
+pub mod opengl;
 
+#[cfg(feature = "opengl")]
+pub use opengl::GLDisplay;
 use {
     crate::{
         event::{Event, EventKind},
@@ -184,5 +188,18 @@ impl LokinitBackend for MacosBackend {
                 return Some(event);
             }
         }
+    }
+
+    #[cfg(feature = "opengl")]
+    fn load_opengl(&mut self) -> GLDisplay {
+        GLDisplay::default()
+    }
+    #[cfg(feature = "opengl")]
+    fn create_window_surface(
+        &self,
+        window: WindowHandle,
+        display: &crate::native::GLDisplay,
+    ) -> crate::native::GLWindowSurface {
+        display.create_window_surface(window, self)
     }
 }

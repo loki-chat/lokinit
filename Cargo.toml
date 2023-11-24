@@ -10,3 +10,7 @@ categories = ["gui"]
 
 [target.'cfg(windows)'.dependencies]
 winapi = {version = "0.3.9", features = ["winuser", "hidusage", "libloaderapi", "shellscalingapi", "windowsx", "errhandlingapi"]}
+
+[features]
+default = ["opengl"]
+opengl = []
