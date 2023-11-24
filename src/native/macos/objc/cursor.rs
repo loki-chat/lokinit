@@ -1,10 +1,9 @@
 use {
     super::{
-        super::bplist::{BPlist, Object},
+        super::bplist::{BPlistParser, Object},
         ffi, msg_ret, str_to_nsstring, NSPoint, VTables,
     },
     std::{collections::HashMap, ffi::c_void, fs::read, path::PathBuf, str::FromStr},
-    syntax::Parser,
 };
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
@@ -63,8 +62,8 @@ fn get_hi_cursor(vtables: &VTables, name: &str) -> *mut c_void {
     let mut path = PathBuf::from_str(BASE_PATH).unwrap();
     path.push(name);
     let bytes = read(path.join("info.plist")).unwrap();
-    let cfg: BPlist = Parser::parse(bytes).unwrap();
-    let Object::Dict(cfg) = cfg.objects.into_iter().next().expect(MOUSE_ERROR) else {
+    let cfg = BPlistParser::new_and_parse(bytes);
+    let Object::Dict(cfg) = cfg.first().expect(MOUSE_ERROR) else {
         panic!("{}", MOUSE_ERROR);
     };
     let (nsimage, nsimage_init, nscursor, nscursor_init, alloc) = (

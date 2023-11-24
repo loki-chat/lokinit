@@ -21,7 +21,7 @@ fn main() {
             .title("World")
             .transparent(false)
             .size(400, 600)
-            .position(400,200)
+            .position(400, 200)
             .resizable(true),
     )
     .unwrap();
@@ -88,5 +88,4 @@ fn main() {
         }
     }
     println!("Event loop ended, quitting!");
-
 }

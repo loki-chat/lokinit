@@ -167,6 +167,10 @@ impl LokinitBackend for MacosBackend {
         }
     }
 
+    fn set_screen_mode(&mut self, handle: WindowHandle, screen_mode: crate::window::ScreenMode) {
+        todo!()
+    }
+
     fn poll_event(&mut self) -> Option<Event> {
         // Prioritize queued events; if there aren't any, process the next NSEvent.
         if let Some(event) = self.event_queue.pop_front() {
