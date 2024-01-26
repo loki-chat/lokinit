@@ -323,6 +323,7 @@ library! {
         background: c_ulong,
     ) -> XWindow;
 
+    pub fn XGetAtomName(display: *mut XDisplay, atom: Atom) -> *const c_char;
     pub fn XInternAtom(
         display: *mut XDisplay,
         atom_name: *const c_char,
