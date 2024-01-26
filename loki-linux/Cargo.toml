@@ -1,0 +1,12 @@
+[package]
+name = "loki-linux"
+description = "Dynamic FFI related to Xlib and wayland-client."
+license = "MIT/Apache-2.0"
+authors = ["Speykious <speykious@gmail.com>"]
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["x11", "wayland"]
+x11 = []
+wayland = []

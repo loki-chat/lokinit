@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use std::ffi::{c_char, c_int};
 
 pub const LC_CTYPE: c_int = 0;

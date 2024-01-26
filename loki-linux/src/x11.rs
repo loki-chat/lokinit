@@ -7,7 +7,6 @@ pub mod xevents;
 pub use xevents::*;
 
 use crate::library;
-use crate::prelude::WindowHandle;
 
 #[repr(C)]
 pub struct XDisplay([u8; 0]);
@@ -15,6 +14,22 @@ pub struct XDisplay([u8; 0]);
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct XID(pub(crate) c_ulong);
+
+impl XID {
+    /// Creates a [`XID`] from a raw ID.
+    ///
+    /// # Safety
+    ///
+    /// Make sure this is a valid X11 window ID.
+    pub unsafe fn from_raw(id: c_ulong) -> Self {
+        Self(id)
+    }
+
+    /// Returns the raw ID of this [`XID`].
+    pub fn raw(&self) -> c_ulong {
+        self.0
+    }
+}
 
 pub type Drawable = XID;
 pub type VisualID = XID;
@@ -31,12 +46,18 @@ pub struct XWindow(pub(crate) c_ulong);
 impl XWindow {
     pub const NONE: Self = XWindow(0);
 
-    pub unsafe fn raw(&self) -> c_ulong {
-        self.0
+    /// Creates an [`XWindow`] from a raw ID.
+    ///
+    /// # Safety
+    ///
+    /// Make sure this is a valid X11 window ID.
+    pub unsafe fn from_raw(id: c_ulong) -> Self {
+        Self(id)
     }
 
-    pub unsafe fn into_window_handle(self) -> WindowHandle {
-        WindowHandle(self.0 as usize)
+    /// Returns the raw ID of this [`XWindow`].
+    pub fn raw(&self) -> c_ulong {
+        self.0
     }
 }
 

@@ -9,20 +9,17 @@ use std::time::Duration;
 use crate::event::{Event, EventKind, KeyboardEvent, MouseButton, MouseEvent};
 use crate::keycode::KeyCode;
 use crate::lok::CreateWindowError;
-use crate::native::linux::x11::ffi::{LibX11, XEvent};
 use crate::prelude::{WindowBuilder, WindowHandle, WindowPos, WindowSize};
 use crate::window::ScreenMode;
 
-use self::ffi::{
-    et, xclass, xcw, xevent_mask, xim, xn, Atom, Status, XClientMessageData, XClientMessageEvent,
-    XDisplay, XErrorEvent, XKeyEvent, XPoint, XSetWindowAttributes, XWindow, XID,
-    X_BUFFER_OVERFLOW, _XIC, _XIM,
+use loki_linux::locale::{setlocale, LC_CTYPE};
+use loki_linux::x11::{
+    et, xclass, xcw, xevent_mask, xim, xn, Atom, LibX11, Status, XClientMessageData,
+    XClientMessageEvent, XDisplay, XErrorEvent, XEvent, XKeyEvent, XPoint, XSetWindowAttributes,
+    XWindow, XID, X_BUFFER_OVERFLOW, _XIC, _XIM,
 };
+use loki_linux::LoadingError;
 
-use super::locale::{setlocale, LC_CTYPE};
-use super::LoadingError;
-
-mod ffi;
 mod keysym;
 
 #[derive(Clone, Debug)]
@@ -40,13 +37,13 @@ impl From<LoadingError> for X11NativeCoreError {
 
 impl From<XWindow> for WindowHandle {
     fn from(value: XWindow) -> Self {
-        Self(value.0 as usize)
+        Self(value.raw() as usize)
     }
 }
 
 impl From<WindowHandle> for XWindow {
     fn from(val: WindowHandle) -> Self {
-        XWindow(val.0 as u64)
+        unsafe { XWindow::from_raw(val.0 as u64) }
     }
 }
 
@@ -191,7 +188,7 @@ impl X11Backend {
 
             (self.x11.XFlush)(self.display.as_ptr());
 
-            let handle = window.into_window_handle();
+            let handle = WindowHandle::from(window);
 
             // save window in core
             self.windows.insert(
@@ -361,13 +358,13 @@ impl X11Backend {
                 let xevent = xevent.xkey;
                 let time = Duration::from_millis(xevent.time);
 
-                let handle = xevent.window.into_window_handle();
+                let handle = WindowHandle::from(xevent.window);
                 let window = self.windows.get(&handle)?;
 
                 let (keysym, text) =
                     utf8_lookup_string(&self.x11, &mut self.str_buffer, window, xevent);
 
-                if let Some(keycode) = keysym::to_keycode(keysym.0 as u32) {
+                if let Some(keycode) = keysym::to_keycode(keysym.raw() as u32) {
                     let kb_event = match (xevent.type_id, self.prev_key) {
                         (et::KEY_PRESS, Some(k)) if k == keycode => {
                             KeyboardEvent::KeyRepeat(keycode)
@@ -413,7 +410,7 @@ impl X11Backend {
                 let xevent = xevent.xbutton;
                 let time = Duration::from_millis(xevent.time);
 
-                let handle = xevent.window.into_window_handle();
+                let handle = WindowHandle::from(xevent.window);
 
                 let mouse_button = match xevent.button {
                     1 => MouseButton::Left,
@@ -439,7 +436,7 @@ impl X11Backend {
                 let xevent = xevent.xconfigure;
                 let time = Duration::from_millis(0);
 
-                let handle = xevent.window.into_window_handle();
+                let handle = WindowHandle::from(xevent.window);
                 let window = self.windows.get_mut(&handle)?;
 
                 let xwin_pos = WindowPos::new(xevent.x, xevent.y);
@@ -469,7 +466,7 @@ impl X11Backend {
                 let xevent = xevent.xdestroywindow;
                 let time = Duration::from_millis(0);
 
-                let handle = xevent.window.into_window_handle();
+                let handle = WindowHandle::from(xevent.window);
 
                 self.event_queue.push_back(Event {
                     time,
@@ -482,7 +479,7 @@ impl X11Backend {
                 let xevent = xevent.xmotion;
                 let time = Duration::from_millis(xevent.time);
 
-                let handle = xevent.window.into_window_handle();
+                let handle = WindowHandle::from(xevent.window);
 
                 self.event_queue.push_back(Event {
                     time,
@@ -495,7 +492,7 @@ impl X11Backend {
                 let xevent = xevent.xcrossing;
                 let time = Duration::from_millis(xevent.time);
 
-                let handle = xevent.window.into_window_handle();
+                let handle = WindowHandle::from(xevent.window);
 
                 let kind = if xevent.type_id == et::ENTER_NOTIFY {
                     EventKind::Mouse(MouseEvent::CursorIn(xevent.x, xevent.y))
@@ -514,7 +511,7 @@ impl X11Backend {
                 let xevent = xevent.xclient;
                 let time = Duration::from_millis(0);
 
-                let handle = xevent.window.into_window_handle();
+                let handle = WindowHandle::from(xevent.window);
                 let window = self.windows.get(&handle)?;
 
                 // if client requests to quit
@@ -564,7 +561,7 @@ unsafe fn utf8_lookup_string<'a>(
     window: &X11NativeWindow,
     mut xpress: XKeyEvent,
 ) -> (XID, Option<Cow<'a, str>>) {
-    let mut keysym = XID(0);
+    let mut keysym = XID::from_raw(0);
     let mut status: Status = 0;
 
     xpress.type_id = et::KEY_PRESS;
