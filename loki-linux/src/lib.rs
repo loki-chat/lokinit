@@ -1,4 +1,6 @@
+use std::error::Error;
 use std::ffi::{c_void, CString};
+use std::fmt;
 use std::ptr::NonNull;
 use std::rc::Rc;
 
@@ -49,6 +51,17 @@ impl Library {
 pub enum LoadingError {
     Library(Rc<str>),
     Symbol(Rc<str>),
+}
+
+impl Error for LoadingError {}
+
+impl fmt::Display for LoadingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LoadingError::Library(msg) => write!(f, "(Library) {}", msg),
+            LoadingError::Symbol(msg) => write!(f, "(Symbol) {}", msg),
+        }
+    }
 }
 
 /// Generates a library struct that loads all the specified functions from the library at runtime.
