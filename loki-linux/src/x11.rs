@@ -352,6 +352,16 @@ library! {
 
     pub fn XStoreName(display: *mut XDisplay, window: XWindow, window_name: *const c_char);
 
+    // Selections
+
+    pub fn XGetSelectionOwner(display: *mut XDisplay, selection: Atom) -> XWindow;
+    pub fn XSetSelectionOwner(
+        display: *mut XDisplay,
+        selection: Atom,
+        owner: XWindow,
+        time: Time
+    ) -> c_int;
+
     // Event Handling
 
     pub fn XPending(display: *mut XDisplay) -> c_int;
