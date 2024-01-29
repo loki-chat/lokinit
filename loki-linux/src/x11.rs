@@ -161,6 +161,29 @@ pub struct XSetWindowAttributes {
     pub cursor: Cursor,
 }
 
+pub mod errcode {
+    use std::ffi::c_int;
+
+    pub const SUCCESS: c_int = 0;
+    pub const BAD_REQUEST: c_int = 1;
+    pub const BAD_VALUE: c_int = 2;
+    pub const BAD_WINDOW: c_int = 3;
+    pub const BAD_PIXMAP: c_int = 4;
+    pub const BAD_ATOM: c_int = 5;
+    pub const BAD_CURSOR: c_int = 6;
+    pub const BAD_FONT: c_int = 7;
+    pub const BAD_MATCH: c_int = 8;
+    pub const BAD_DRAWABLE: c_int = 9;
+    pub const BAD_ACCESS: c_int = 10;
+    pub const BAD_ALLOC: c_int = 11;
+    pub const BAD_COLOR: c_int = 12;
+    pub const BAD_GC: c_int = 13;
+    pub const BAD_ID_CHOICE: c_int = 14;
+    pub const BAD_NAME: c_int = 15;
+    pub const BAD_LENGTH: c_int = 16;
+    pub const BAD_IMPLEMENTATION: c_int = 17;
+}
+
 pub mod xclass {
     use std::ffi::c_uint;
 
@@ -281,6 +304,14 @@ pub mod xn {
     pub const SEPARATOROF_NESTED_LIST:       *const c_char = b"separatorofNestedList\0"      .as_ptr() as *const _;
 }
 
+pub mod prop_mode {
+    use std::ffi::c_int;
+
+    pub const REPLACE: c_int = 0;
+    pub const PREPEND: c_int = 1;
+    pub const APPEND: c_int = 2;
+}
+
 library! {
     [LibX11 <-> "X11"];
 
@@ -336,6 +367,32 @@ library! {
         count: c_int,
     ) -> Status;
 
+    pub fn XGetWindowProperty(
+        display: *mut XDisplay,
+        win: XWindow,
+        property: Atom,
+        long_offset: c_long,
+        long_length: c_long,
+        delete: Bool,
+        req_type: Atom,
+        actual_type_return: *mut Atom,
+        actual_format_return: *mut c_int,
+        nitems_return: *mut c_ulong,
+        bytes_after_return: *mut c_ulong,
+        prop_return: *mut *mut c_void,
+    ) -> c_int;
+    pub fn XChangeProperty(
+        display: *mut XDisplay,
+        win: XWindow,
+        property: Atom,
+        ty: Atom,
+        format: c_int,
+        mode: c_int,
+        data: *const u8,
+        nelements: c_int
+    );
+    pub fn XDeleteProperty(display: *mut XDisplay, win: XWindow, property: Atom);
+
     pub fn XMapWindow(display: *mut XDisplay, window: XWindow);
     pub fn XUnmapWindow(display: *mut XDisplay, window: XWindow);
 
@@ -359,6 +416,14 @@ library! {
         display: *mut XDisplay,
         selection: Atom,
         owner: XWindow,
+        time: Time
+    ) -> c_int;
+    pub fn XConvertSelection(
+        display: *mut XDisplay,
+        selection: Atom,
+        target: Atom,
+        property: Atom,
+        requestor: XWindow,
         time: Time
     ) -> c_int;
 
