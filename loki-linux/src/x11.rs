@@ -388,7 +388,7 @@ library! {
         ty: Atom,
         format: c_int,
         mode: c_int,
-        data: *const u8,
+        data: *const c_void,
         nelements: c_int
     );
     pub fn XDeleteProperty(display: *mut XDisplay, win: XWindow, property: Atom);
