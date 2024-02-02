@@ -366,6 +366,7 @@ library! {
         protocols: *const Atom,
         count: c_int,
     ) -> Status;
+    pub fn XMaxRequestSize(display: *mut XDisplay) -> c_long;
 
     pub fn XGetWindowProperty(
         display: *mut XDisplay,
