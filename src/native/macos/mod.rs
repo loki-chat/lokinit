@@ -181,4 +181,14 @@ impl LokinitBackend for MacosBackend {
             }
         }
     }
+
+    #[cfg(feature = "raw-window-handle")]
+    fn raw_display_handle(&self) -> raw_window_handle::RawDisplayHandle {
+        todo!()
+    }
+
+    #[cfg(feature = "raw-window-handle")]
+    fn raw_window_handle_for(&self, window_handle: WindowHandle) -> raw_window_handle::RawWindowHandle {
+        todo!()
+    }
 }

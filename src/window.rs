@@ -118,3 +118,17 @@ impl WindowBuilder {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct WindowHandle(pub(crate) usize);
+
+#[cfg(feature = "raw-window-handle")]
+unsafe impl raw_window_handle::HasRawWindowHandle for WindowHandle {
+    fn raw_window_handle(&self) -> raw_window_handle::RawWindowHandle {
+        crate::lok::raw_window_handle(*self)
+    }
+}
+
+#[cfg(feature = "raw-window-handle")]
+unsafe impl raw_window_handle::HasRawDisplayHandle for WindowHandle {
+    fn raw_display_handle(&self) -> raw_window_handle::RawDisplayHandle {
+        crate::lok::raw_display_handle()
+    }
+}

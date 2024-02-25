@@ -10,6 +10,13 @@ authors = ["The Loki Authors"]
 keywords = ["windowing"]
 categories = ["gui"]
 
+[features]
+default = ["raw-window-handle"]
+raw-window-handle = ["dep:raw-window-handle"]
+
+[dependencies]
+raw-window-handle = { version = "0.5.2", optional = true }
+
 [target.'cfg(target_os = "linux")'.dependencies]
 loki-linux = { path = "./loki-linux" }
 

@@ -44,6 +44,19 @@ pub trait LokinitBackend {
     fn fetch_monitors(&mut self) -> Vec<Monitor> {
         unimplemented!()
     }
+
+    #[cfg(feature = "raw-window-handle")]
+    fn raw_display_handle(&self) -> raw_window_handle::RawDisplayHandle;
+
+    #[cfg(feature = "raw-window-handle")]
+    fn raw_window_handle_for(&self, window_handle: WindowHandle) -> raw_window_handle::RawWindowHandle;
+}
+
+#[cfg(feature = "raw-window-handle")]
+unsafe impl raw_window_handle::HasRawDisplayHandle for dyn LokinitBackend {
+    fn raw_display_handle(&self) -> raw_window_handle::RawDisplayHandle {
+        self.raw_display_handle()
+    }
 }
 
 thread_local! {
@@ -75,7 +88,13 @@ pub fn init_backend<B: LokinitBackend + 'static>() {
 pub fn with<R>(callback: impl FnOnce(&mut dyn LokinitBackend) -> R) -> R {
     INSTANCE.with(|instance| {
         let mut instance = instance.borrow_mut();
-        let instance = instance.as_deref_mut().expect("Lokinit is not initialized");
+        let instance = instance
+            .as_deref_mut()
+            .expect(if INITIALIZED.load(Ordering::Relaxed) {
+                "Accessing Lokinit from a non-main thread"
+            } else {
+                "Lokinit is not initialized"
+            });
         (callback)(instance)
     })
 }
@@ -98,4 +117,14 @@ pub fn set_screen_mode(handle: WindowHandle, screen_mode: ScreenMode) {
 
 pub fn fetch_monitors() -> Vec<Monitor> {
     with(|instance| instance.fetch_monitors())
+}
+
+#[cfg(feature = "raw-window-handle")]
+pub fn raw_display_handle() -> raw_window_handle::RawDisplayHandle {
+    with(|instance| instance.raw_display_handle())
+}
+
+#[cfg(feature = "raw-window-handle")]
+pub fn raw_window_handle(window_handle: WindowHandle) -> raw_window_handle::RawWindowHandle {
+    with(|instance| instance.raw_window_handle_for(window_handle))
 }
