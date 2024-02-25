@@ -10,7 +10,9 @@ fn main() {
             .title("Hello")
             .transparent(false)
             .centered(true)
-            .size(600, 400),
+            .size(600, 400)
+            .position(200, 400)
+            .resizable(true),
     )
     .unwrap();
 
@@ -18,7 +20,9 @@ fn main() {
         WindowBuilder::new()
             .title("World")
             .transparent(false)
-            .size(400, 600),
+            .size(400, 600)
+            .position(400,200)
+            .resizable(true),
     )
     .unwrap();
 
@@ -83,6 +87,6 @@ fn main() {
             _ => {}
         }
     }
-
     println!("Event loop ended, quitting!");
+
 }
