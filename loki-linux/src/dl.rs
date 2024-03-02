@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use std::ffi::{c_char, c_int, c_void, CStr};
 use std::rc::Rc;
 
