@@ -66,6 +66,13 @@ pub type Time = c_ulong;
 pub type Atom = c_ulong;
 pub type Bool = c_int;
 
+pub mod bool {
+    use super::Bool;
+
+    pub const FALSE: Bool = 0;
+    pub const TRUE: Bool = 0;
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct XPoint {
@@ -312,6 +319,13 @@ pub mod prop_mode {
     pub const APPEND: c_int = 2;
 }
 
+pub mod property {
+    use std::ffi::c_int;
+
+    pub const NEW_VALUE: c_int = 0;
+    pub const DELETE: c_int = 1;
+}
+
 library! {
     [LibX11 <-> "X11"];
 
@@ -326,6 +340,7 @@ library! {
     pub fn XCloseDisplay(display: *mut XDisplay);
     pub fn XDefaultScreen(display: *mut XDisplay) -> c_int;
     pub fn XDefaultRootWindow(display: *mut XDisplay) -> XWindow;
+    pub fn XDestroyWindow(display: *mut XDisplay, win: XWindow);
 
     pub fn XCreateWindow(
         display: *mut XDisplay,
@@ -366,6 +381,7 @@ library! {
         protocols: *const Atom,
         count: c_int,
     ) -> Status;
+    pub fn XMaxRequestSize(display: *mut XDisplay) -> c_long;
 
     pub fn XGetWindowProperty(
         display: *mut XDisplay,
@@ -388,7 +404,7 @@ library! {
         ty: Atom,
         format: c_int,
         mode: c_int,
-        data: *const u8,
+        data: *const c_void,
         nelements: c_int
     );
     pub fn XDeleteProperty(display: *mut XDisplay, win: XWindow, property: Atom);
