@@ -26,17 +26,16 @@ impl WindowSize {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WindowBorder {
-    Top,
-    Bottom,
-    Left,
-    Right,
+    Top = 0,
+    Bottom = 1,
+    Left = 2,
+    Right = 3,
 
-    TopLeft,
-    TopRight,
-    BottomLeft,
-    BottomRight,
+    TopLeft = 4,
+    TopRight = 5,
+    BottomLeft = 6,
+    BottomRight = 7,
 }
-
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub enum ScreenMode {
