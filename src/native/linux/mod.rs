@@ -1,102 +1,12 @@
-use std::ffi::{c_void, CString};
-use std::fmt;
-use std::ptr::NonNull;
-use std::rc::Rc;
-
 use crate::event::Event;
 use crate::lok::{CreateWindowError, LokinitBackend};
-use crate::window::{WindowBuilder, WindowHandle};
+use crate::window::{WindowBuilder, WindowHandle, ScreenMode};
 
-use dl::{dlopen, dlsym, get_dlerror, RTLD_NOW};
 use wayland::WaylandBackend;
 use x11::X11Backend;
 
-mod dl;
-mod locale;
 pub mod wayland;
 pub mod x11;
-
-/// A wrapper for all the dl methods
-struct Library {
-    handle: NonNull<c_void>,
-}
-
-impl Library {
-    /// Create a new Library from the name of its file.
-    ///
-    /// Usually, Linux libraries are in the form `lib<name>.so`.
-    ///
-    /// This function *will* append the `lib` prefix and `.so` extension for you, so don't do it yourself.
-    pub fn new(name: &str) -> Result<Self, Rc<str>> {
-        let c_str = CString::new(format!("lib{}.so", name)).unwrap();
-        let lib = unsafe { dlopen(c_str.as_ptr(), RTLD_NOW) };
-
-        if lib.is_null() {
-            Err(get_dlerror().unwrap())
-        } else {
-            Ok(Self {
-                handle: unsafe { NonNull::new_unchecked(lib) },
-            })
-        }
-    }
-
-    pub fn get_sym<F: Sized>(&self, sym: &str) -> Result<F, Rc<str>> {
-        let c_str = CString::new(sym).unwrap();
-        let sym = unsafe { dlsym(self.handle.as_ptr(), c_str.as_ptr()) };
-
-        if sym.is_null() {
-            Err(get_dlerror().unwrap())
-        } else {
-            Ok(unsafe { std::mem::transmute_copy::<_, F>(&sym) })
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub enum LoadingError {
-    Library(Rc<str>),
-    Symbol(Rc<str>),
-}
-
-impl std::error::Error for LoadingError {}
-
-impl fmt::Display for LoadingError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Library(err) => write!(f, "Library loading error: {}", err),
-            Self::Symbol(err) => write!(f, "Symbol loading error: {}", err),
-        }
-    }
-}
-
-/// Generates a library struct that loads all the specified functions from the library at runtime.
-#[macro_export]
-macro_rules! library {
-    (
-        [ $lib:ident <-> $name:literal ] ;
-
-        $( { $( $sym_name:ident : $sym_type:ty );* ; } )?
-
-        $( pub fn $fn:ident $args:tt $(-> $res:ty)? );* ;
-    ) => {
-        pub struct $lib {
-            $($(pub $sym_name: $sym_type,)*)?
-            $(pub $fn: unsafe extern "C" fn$args$( -> $res)?,)*
-        }
-
-        impl $lib {
-            pub unsafe fn new() -> Result<Self, $crate::native::linux::LoadingError> {
-                let lib = $crate::native::linux::Library::new($name)
-                    .map_err($crate::native::linux::LoadingError::Library)?;
-
-                Ok(Self {
-                    $($($sym_name: lib.get_sym(stringify!($sym_name)).map_err($crate::native::linux::LoadingError::Symbol)?,)*)?
-                    $($fn: lib.get_sym(stringify!($fn)).map_err($crate::native::linux::LoadingError::Symbol)?,)*
-                })
-            }
-        }
-    };
-}
 
 pub enum LinuxBackend {
     X11(X11Backend),
@@ -139,6 +49,13 @@ impl LokinitBackend for LinuxBackend {
     fn poll_event(&mut self) -> Option<Event> {
         match self {
             Self::X11(x11) => x11.poll_event(),
+            Self::Wayland(_wl) => todo!(),
+        }
+    }
+
+    fn set_screen_mode(&mut self, handle: WindowHandle, screen_mode: ScreenMode) {
+        match self {
+            Self::X11(x11) => x11.set_screen_mode(handle, screen_mode),
             Self::Wayland(_wl) => todo!(),
         }
     }

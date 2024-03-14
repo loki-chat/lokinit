@@ -1,28 +1,25 @@
 #![allow(unused)]
 
 use std::borrow::Cow;
-use std::collections::{BTreeMap, VecDeque};
-use std::ffi::{c_int, c_void, CString};
-use std::fmt;
+use std::collections::{HashMap, VecDeque};
+use std::ffi::{c_int, c_long, c_void, CString};
 use std::ptr::{null, null_mut, NonNull};
-use std::time::{Duration, Instant, SystemTime};
+use std::time::Duration;
 
 use crate::event::{Event, EventKind, KeyboardEvent, MouseButton, MouseEvent};
 use crate::keycode::KeyCode;
-use crate::library;
 use crate::lok::CreateWindowError;
-use crate::native::linux::x11::ffi::{LibX11, XEvent};
 use crate::prelude::{WindowBuilder, WindowHandle, WindowPos, WindowSize};
+use crate::window::ScreenMode;
 
-use self::ffi::{
-    et, xclass, xcw, xevent_mask, xim, xn, Status, XConfigureEvent, XDisplay, XErrorEvent,
-    XKeyEvent, XPoint, XSetWindowAttributes, XWindow, XID, X_BUFFER_OVERFLOW, _XIC, _XIM,
+use loki_linux::locale::{setlocale, LC_CTYPE};
+use loki_linux::x11::{
+    et, xclass, xcw, xevent_mask, xim, xn, Atom, LibX11, Status, XClientMessageData,
+    XClientMessageEvent, XDisplay, XErrorEvent, XEvent, XKeyEvent, XPoint, XSetWindowAttributes,
+    XWindow, XID, X_BUFFER_OVERFLOW, _XIC, _XIM,
 };
+use loki_linux::LoadingError;
 
-use super::locale::{setlocale, LC_CTYPE};
-use super::LoadingError;
-
-mod ffi;
 mod keysym;
 
 #[derive(Clone, Debug)]
@@ -38,15 +35,15 @@ impl From<LoadingError> for X11NativeCoreError {
     }
 }
 
-impl std::error::Error for X11NativeCoreError {}
+impl From<XWindow> for WindowHandle {
+    fn from(value: XWindow) -> Self {
+        Self(value.raw() as usize)
+    }
+}
 
-impl fmt::Display for X11NativeCoreError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::LibLoading(load_err) => write!(f, "X11 {}", load_err),
-            Self::CannotOpenDisplay => write!(f, "X11 error: cannot open display"),
-            Self::CannotOpenInputMethod => write!(f, "X11 error: cannot open input method"),
-        }
+impl From<WindowHandle> for XWindow {
+    fn from(val: WindowHandle) -> Self {
+        unsafe { XWindow::from_raw(val.0 as u64) }
     }
 }
 
@@ -63,10 +60,9 @@ pub struct X11Backend {
     root: XWindow,
     xim: NonNull<_XIM>,
     display: NonNull<XDisplay>,
-    windows: BTreeMap<WindowHandle, X11NativeWindow>,
+    windows: HashMap<WindowHandle, X11NativeWindow>,
     event_queue: VecDeque<Event>,
     prev_key: Option<KeyCode>,
-    is_composing: bool,
     str_buffer: Vec<u8>,
     n_windows: u32,
 }
@@ -112,10 +108,9 @@ impl X11Backend {
                 root,
                 xim,
                 display,
-                windows: BTreeMap::new(),
+                windows: HashMap::new(),
                 event_queue: VecDeque::new(),
                 prev_key: None,
-                is_composing: false,
                 str_buffer: vec![0; 16],
                 n_windows: 0,
             })
@@ -193,7 +188,7 @@ impl X11Backend {
 
             (self.x11.XFlush)(self.display.as_ptr());
 
-            let handle = window.into_window_handle();
+            let handle = WindowHandle::from(window);
 
             // save window in core
             self.windows.insert(
@@ -257,6 +252,102 @@ impl X11Backend {
         }
     }
 
+    pub fn set_screen_mode(&mut self, window: WindowHandle, screen_mode: ScreenMode) {
+        // TODO: what really is the difference between borderless and fullscreen on X11?
+        // What about bypassing the compositor as well?
+
+        match screen_mode {
+            ScreenMode::Windowed => {
+                self.send_wm_state_client_message(
+                    window,
+                    WmStateAction::Remove,
+                    b"_NET_WM_STATE_FULLSCREEN\0",
+                );
+            }
+            ScreenMode::Borderless => {
+                self.send_wm_state_client_message(
+                    window,
+                    WmStateAction::Add,
+                    b"_NET_WM_STATE_FULLSCREEN\0",
+                );
+            }
+            ScreenMode::Fullscreen => {
+                self.send_wm_state_client_message(
+                    window,
+                    WmStateAction::Add,
+                    b"_NET_WM_STATE_FULLSCREEN\0",
+                );
+            }
+        }
+    }
+
+    pub fn window_pos(&self, window: WindowHandle) -> WindowPos {
+        self.get_window(window).position
+    }
+
+    pub fn window_size(&self, window: WindowHandle) -> WindowSize {
+        self.get_window(window).size
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum WmStateAction {
+    Remove = 0,
+    Add = 1,
+    Toggle = 2,
+}
+
+impl X11Backend {
+    fn get_window(&self, window: WindowHandle) -> &X11NativeWindow {
+        self.windows.get(&window).unwrap()
+    }
+
+    unsafe fn intern_atom(&self, name: &[u8]) -> Atom {
+        (self.x11.XInternAtom)(self.display.as_ptr(), name.as_ptr() as *const _, false as _)
+    }
+
+    /// Send a client message to tell X to change the state of the window.
+    fn send_wm_state_client_message(
+        &self,
+        window: WindowHandle,
+        action: WmStateAction,
+        prop: &[u8],
+    ) {
+        let wm_state = unsafe { self.intern_atom(b"_NET_WM_STATE\0") };
+        let wm_prop = unsafe { self.intern_atom(prop) };
+
+        let action = match action {
+            WmStateAction::Remove => 0,
+            WmStateAction::Add => 1,
+            WmStateAction::Toggle => 2,
+        };
+
+        let mut event = XEvent {
+            xclient: XClientMessageEvent {
+                type_id: et::CLIENT_MESSAGE,
+                serial: 0,
+                send_event: true as _,
+                message_type: wm_state,
+                window: window.into(),
+                display: self.display.as_ptr(),
+                format: 32,
+                data: XClientMessageData {
+                    l: [action, wm_prop as c_long, 0, 0, 0],
+                },
+            },
+        };
+
+        unsafe {
+            (self.x11.XSendEvent)(
+                self.display.as_ptr(),
+                self.root,
+                false as _,
+                xevent_mask::SUBSTRUCTURE_REDIRECT | xevent_mask::STRUCTURE_NOTIFY,
+                &mut event as *mut _,
+            );
+        }
+    }
+
     /// Transform an `XEvent` into one or more Lokinit `Event`s and push them into the event queue.
     /// Returns `Some(())` if the window emitting the event exists, `None` otherwise.
     ///
@@ -267,13 +358,13 @@ impl X11Backend {
                 let xevent = xevent.xkey;
                 let time = Duration::from_millis(xevent.time);
 
-                let handle = xevent.window.into_window_handle();
+                let handle = WindowHandle::from(xevent.window);
                 let window = self.windows.get(&handle)?;
 
                 let (keysym, text) =
                     utf8_lookup_string(&self.x11, &mut self.str_buffer, window, xevent);
 
-                if let Some(keycode) = keysym::to_keycode(keysym.0 as u32) {
+                if let Some(keycode) = keysym::to_keycode(keysym.raw() as u32) {
                     let kb_event = match (xevent.type_id, self.prev_key) {
                         (et::KEY_PRESS, Some(k)) if k == keycode => {
                             KeyboardEvent::KeyRepeat(keycode)
@@ -319,8 +410,7 @@ impl X11Backend {
                 let xevent = xevent.xbutton;
                 let time = Duration::from_millis(xevent.time);
 
-                let handle = xevent.window.into_window_handle();
-                let window = self.windows.get(&handle)?;
+                let handle = WindowHandle::from(xevent.window);
 
                 let mouse_button = match xevent.button {
                     1 => MouseButton::Left,
@@ -346,7 +436,7 @@ impl X11Backend {
                 let xevent = xevent.xconfigure;
                 let time = Duration::from_millis(0);
 
-                let handle = xevent.window.into_window_handle();
+                let handle = WindowHandle::from(xevent.window);
                 let window = self.windows.get_mut(&handle)?;
 
                 let xwin_pos = WindowPos::new(xevent.x, xevent.y);
@@ -376,8 +466,7 @@ impl X11Backend {
                 let xevent = xevent.xdestroywindow;
                 let time = Duration::from_millis(0);
 
-                let handle = xevent.window.into_window_handle();
-                let window = self.windows.get(&handle)?;
+                let handle = WindowHandle::from(xevent.window);
 
                 self.event_queue.push_back(Event {
                     time,
@@ -390,8 +479,7 @@ impl X11Backend {
                 let xevent = xevent.xmotion;
                 let time = Duration::from_millis(xevent.time);
 
-                let handle = xevent.window.into_window_handle();
-                let window = self.windows.get(&handle)?;
+                let handle = WindowHandle::from(xevent.window);
 
                 self.event_queue.push_back(Event {
                     time,
@@ -404,8 +492,7 @@ impl X11Backend {
                 let xevent = xevent.xcrossing;
                 let time = Duration::from_millis(xevent.time);
 
-                let handle = xevent.window.into_window_handle();
-                let window = self.windows.get(&handle)?;
+                let handle = WindowHandle::from(xevent.window);
 
                 let kind = if xevent.type_id == et::ENTER_NOTIFY {
                     EventKind::Mouse(MouseEvent::CursorIn(xevent.x, xevent.y))
@@ -424,7 +511,7 @@ impl X11Backend {
                 let xevent = xevent.xclient;
                 let time = Duration::from_millis(0);
 
-                let handle = xevent.window.into_window_handle();
+                let handle = WindowHandle::from(xevent.window);
                 let window = self.windows.get(&handle)?;
 
                 // if client requests to quit
@@ -441,18 +528,6 @@ impl X11Backend {
         }
 
         Some(())
-    }
-
-    fn get_window(&self, window: WindowHandle) -> &X11NativeWindow {
-        self.windows.get(&window).unwrap()
-    }
-
-    pub fn window_pos(&self, window: WindowHandle) -> WindowPos {
-        self.get_window(window).position
-    }
-
-    pub fn window_size(&self, window: WindowHandle) -> WindowSize {
-        self.get_window(window).size
     }
 }
 
@@ -477,7 +552,7 @@ unsafe fn place_ime(x11: &LibX11, xic: NonNull<_XIC>, place: XPoint) {
         null_mut::<c_void>(),
     );
 
-    (x11.XFree)(preedit_attr as *mut c_void);
+    (x11.XFree)(preedit_attr);
 }
 
 unsafe fn utf8_lookup_string<'a>(
@@ -486,7 +561,7 @@ unsafe fn utf8_lookup_string<'a>(
     window: &X11NativeWindow,
     mut xpress: XKeyEvent,
 ) -> (XID, Option<Cow<'a, str>>) {
-    let mut keysym = XID(0);
+    let mut keysym = XID::from_raw(0);
     let mut status: Status = 0;
 
     xpress.type_id = et::KEY_PRESS;

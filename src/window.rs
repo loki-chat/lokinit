@@ -1,6 +1,6 @@
 use crate::lok::MonitorId;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct WindowPos {
     pub x: i32,
     pub y: i32,
@@ -12,7 +12,7 @@ impl WindowPos {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct WindowSize {
     pub width: u32,
     pub height: u32,
@@ -24,7 +24,20 @@ impl WindowSize {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WindowBorder {
+    Top = 0,
+    Bottom = 1,
+    Left = 2,
+    Right = 3,
+
+    TopLeft = 4,
+    TopRight = 5,
+    BottomLeft = 6,
+    BottomRight = 7,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub enum ScreenMode {
     #[default]
     Windowed,
@@ -32,7 +45,7 @@ pub enum ScreenMode {
     Fullscreen,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct WindowBuilder {
     pub(crate) title: String,
     pub(crate) position: WindowPos,

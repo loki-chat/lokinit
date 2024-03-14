@@ -7,7 +7,6 @@ pub mod xevents;
 pub use xevents::*;
 
 use crate::library;
-use crate::prelude::WindowHandle;
 
 #[repr(C)]
 pub struct XDisplay([u8; 0]);
@@ -15,6 +14,22 @@ pub struct XDisplay([u8; 0]);
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct XID(pub(crate) c_ulong);
+
+impl XID {
+    /// Creates a [`XID`] from a raw ID.
+    ///
+    /// # Safety
+    ///
+    /// Make sure this is a valid X11 window ID.
+    pub unsafe fn from_raw(id: c_ulong) -> Self {
+        Self(id)
+    }
+
+    /// Returns the raw ID of this [`XID`].
+    pub fn raw(&self) -> c_ulong {
+        self.0
+    }
+}
 
 pub type Drawable = XID;
 pub type VisualID = XID;
@@ -26,17 +41,23 @@ pub type KeySym = XID;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct XWindow(c_ulong);
+pub struct XWindow(pub(crate) c_ulong);
 
 impl XWindow {
     pub const NONE: Self = XWindow(0);
 
-    pub unsafe fn raw(&self) -> c_ulong {
-        self.0
+    /// Creates an [`XWindow`] from a raw ID.
+    ///
+    /// # Safety
+    ///
+    /// Make sure this is a valid X11 window ID.
+    pub unsafe fn from_raw(id: c_ulong) -> Self {
+        Self(id)
     }
 
-    pub unsafe fn into_window_handle(self) -> WindowHandle {
-        WindowHandle(self.0 as usize)
+    /// Returns the raw ID of this [`XWindow`].
+    pub fn raw(&self) -> c_ulong {
+        self.0
     }
 }
 
@@ -44,6 +65,13 @@ pub type Status = c_int;
 pub type Time = c_ulong;
 pub type Atom = c_ulong;
 pub type Bool = c_int;
+
+pub mod bool {
+    use super::Bool;
+
+    pub const FALSE: Bool = 0;
+    pub const TRUE: Bool = 0;
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -138,6 +166,29 @@ pub struct XSetWindowAttributes {
     pub override_redirect: Bool,
     pub colormap: Colormap,
     pub cursor: Cursor,
+}
+
+pub mod errcode {
+    use std::ffi::c_int;
+
+    pub const SUCCESS: c_int = 0;
+    pub const BAD_REQUEST: c_int = 1;
+    pub const BAD_VALUE: c_int = 2;
+    pub const BAD_WINDOW: c_int = 3;
+    pub const BAD_PIXMAP: c_int = 4;
+    pub const BAD_ATOM: c_int = 5;
+    pub const BAD_CURSOR: c_int = 6;
+    pub const BAD_FONT: c_int = 7;
+    pub const BAD_MATCH: c_int = 8;
+    pub const BAD_DRAWABLE: c_int = 9;
+    pub const BAD_ACCESS: c_int = 10;
+    pub const BAD_ALLOC: c_int = 11;
+    pub const BAD_COLOR: c_int = 12;
+    pub const BAD_GC: c_int = 13;
+    pub const BAD_ID_CHOICE: c_int = 14;
+    pub const BAD_NAME: c_int = 15;
+    pub const BAD_LENGTH: c_int = 16;
+    pub const BAD_IMPLEMENTATION: c_int = 17;
 }
 
 pub mod xclass {
@@ -260,6 +311,21 @@ pub mod xn {
     pub const SEPARATOROF_NESTED_LIST:       *const c_char = b"separatorofNestedList\0"      .as_ptr() as *const _;
 }
 
+pub mod prop_mode {
+    use std::ffi::c_int;
+
+    pub const REPLACE: c_int = 0;
+    pub const PREPEND: c_int = 1;
+    pub const APPEND: c_int = 2;
+}
+
+pub mod property {
+    use std::ffi::c_int;
+
+    pub const NEW_VALUE: c_int = 0;
+    pub const DELETE: c_int = 1;
+}
+
 library! {
     [LibX11 <-> "X11"];
 
@@ -274,6 +340,7 @@ library! {
     pub fn XCloseDisplay(display: *mut XDisplay);
     pub fn XDefaultScreen(display: *mut XDisplay) -> c_int;
     pub fn XDefaultRootWindow(display: *mut XDisplay) -> XWindow;
+    pub fn XDestroyWindow(display: *mut XDisplay, win: XWindow);
 
     pub fn XCreateWindow(
         display: *mut XDisplay,
@@ -302,6 +369,7 @@ library! {
         background: c_ulong,
     ) -> XWindow;
 
+    pub fn XGetAtomName(display: *mut XDisplay, atom: Atom) -> *const c_char;
     pub fn XInternAtom(
         display: *mut XDisplay,
         atom_name: *const c_char,
@@ -313,6 +381,33 @@ library! {
         protocols: *const Atom,
         count: c_int,
     ) -> Status;
+    pub fn XMaxRequestSize(display: *mut XDisplay) -> c_long;
+
+    pub fn XGetWindowProperty(
+        display: *mut XDisplay,
+        win: XWindow,
+        property: Atom,
+        long_offset: c_long,
+        long_length: c_long,
+        delete: Bool,
+        req_type: Atom,
+        actual_type_return: *mut Atom,
+        actual_format_return: *mut c_int,
+        nitems_return: *mut c_ulong,
+        bytes_after_return: *mut c_ulong,
+        prop_return: *mut *mut c_void,
+    ) -> c_int;
+    pub fn XChangeProperty(
+        display: *mut XDisplay,
+        win: XWindow,
+        property: Atom,
+        ty: Atom,
+        format: c_int,
+        mode: c_int,
+        data: *const c_void,
+        nelements: c_int
+    );
+    pub fn XDeleteProperty(display: *mut XDisplay, win: XWindow, property: Atom);
 
     pub fn XMapWindow(display: *mut XDisplay, window: XWindow);
     pub fn XUnmapWindow(display: *mut XDisplay, window: XWindow);
@@ -330,10 +425,35 @@ library! {
 
     pub fn XStoreName(display: *mut XDisplay, window: XWindow, window_name: *const c_char);
 
+    // Selections
+
+    pub fn XGetSelectionOwner(display: *mut XDisplay, selection: Atom) -> XWindow;
+    pub fn XSetSelectionOwner(
+        display: *mut XDisplay,
+        selection: Atom,
+        owner: XWindow,
+        time: Time
+    ) -> c_int;
+    pub fn XConvertSelection(
+        display: *mut XDisplay,
+        selection: Atom,
+        target: Atom,
+        property: Atom,
+        requestor: XWindow,
+        time: Time
+    ) -> c_int;
+
     // Event Handling
 
     pub fn XPending(display: *mut XDisplay) -> c_int;
     pub fn XNextEvent(display: *mut XDisplay, event: *mut XEvent) -> c_int;
+    pub fn XSendEvent(
+        display: *mut XDisplay,
+        window: XWindow,
+        propagate: c_int,
+        event_mask: c_long,
+        event_send: *mut XEvent,
+    ) -> c_int;
 
     // XKB
 

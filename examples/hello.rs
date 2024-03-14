@@ -1,4 +1,5 @@
 use lokinit::prelude::*;
+use lokinit::window::ScreenMode;
 
 fn main() {
     // hehe
@@ -9,7 +10,9 @@ fn main() {
             .title("Hello")
             .transparent(false)
             .centered(true)
-            .size(600, 400),
+            .size(600, 400)
+            .position(200, 400)
+            .resizable(true),
     )
     .unwrap();
 
@@ -17,7 +20,9 @@ fn main() {
         WindowBuilder::new()
             .title("World")
             .transparent(false)
-            .size(400, 600),
+            .size(400, 600)
+            .position(400, 200)
+            .resizable(true),
     )
     .unwrap();
 
@@ -43,7 +48,21 @@ fn main() {
                 _ => {}
             },
             EventKind::Keyboard(event) => match event {
-                KeyboardEvent::KeyPress(keycode) => println!("[{win:?}] Key {keycode:?} pressed"),
+                KeyboardEvent::KeyPress(keycode) => {
+                    println!("[{win:?}] Key {keycode:?} pressed");
+
+                    match keycode {
+                        KeyCode::F => {
+                            println!("[{win:?}] FULLSCREEN");
+                            lok::set_screen_mode(win, ScreenMode::Fullscreen);
+                        }
+                        KeyCode::W => {
+                            println!("[{win:?}] WINDOWED");
+                            lok::set_screen_mode(win, ScreenMode::Windowed);
+                        }
+                        _ => (),
+                    }
+                }
                 KeyboardEvent::KeyRelease(keycode) => {
                     println!("[{win:?}] Key {keycode:?} released")
                 }
@@ -68,6 +87,5 @@ fn main() {
             _ => {}
         }
     }
-
     println!("Event loop ended, quitting!");
 }
