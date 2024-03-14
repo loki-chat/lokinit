@@ -5,11 +5,15 @@ mod window;
 use {
     crate::{
         event::{Event, EventKind},
+        keycode::KeyCode,
         lok::{CreateWindowError, LokinitBackend},
         window::{WindowBorder, WindowBuilder, WindowHandle},
     },
     loki_mac::*,
-    std::{collections::HashMap, collections::VecDeque, time::Duration},
+    std::{
+        collections::{HashMap, HashSet, VecDeque},
+        time::Duration,
+    },
     window::Window,
 };
 
@@ -24,6 +28,8 @@ pub struct MacosBackend {
     pub event_queue: VecDeque<Event>,
     /// If a window is resizing, the direction it's resizing in.
     pub resize_direction: Option<WindowBorder>,
+    /// Currently pressed modifier keys. Modifier keys are shift, command, alt, and control.
+    pub active_modifiers: HashSet<KeyCode>,
     /// An underlying AppKit `NSApplication` instance.
     pub nsapp: NSApp,
 }
@@ -68,6 +74,7 @@ impl LokinitBackend for MacosBackend {
             frontmost_window: None,
             event_queue: VecDeque::new(),
             resize_direction: None,
+            active_modifiers: HashSet::default(),
             nsapp,
         }
     }
@@ -127,17 +134,18 @@ impl LokinitBackend for MacosBackend {
     }
 
     fn poll_event(&mut self) -> Option<Event> {
-        self.event_queue.pop_front().or_else(|| loop {
+        loop {
+            if let Some(event) = self.event_queue.pop_front() {
+                return Some(event);
+            }
+
             let raw_event = self.nsapp.next_event(
                 NSEventMask::Any,
                 NSDate::distant_future(),
                 NSRunLoopMode::Default,
                 true,
             );
-
-            if let Some(event) = self.handle_raw_event(raw_event) {
-                return Some(event);
-            }
-        })
+            self.handle_raw_event(raw_event);
+        }
     }
 }

@@ -154,3 +154,24 @@ pub enum NSApplicationActivationPolicy {
     Accessory,
     Prohibited,
 }
+
+#[repr(usize)]
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum NSEventModifierFlags {
+    /// Caps lock was pressed.
+    CapsLock = 1 << 16,
+    /// Shift was pressed.
+    Shift = 1 << 17,
+    /// Control was pressed.
+    Control = 1 << 18,
+    /// Option or Alt was pressed.
+    Option = 1 << 19,
+    /// Command (Windows key) was pressed.
+    Command = 1 << 20,
+    /// A number keypad key or arrow key was pressed.
+    NumericPad = 1 << 21,
+    /// The Help key was pressed.
+    Help = 1 << 22,
+    /// A function key was pressed.
+    Function = 1 << 23,
+}

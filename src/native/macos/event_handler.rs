@@ -4,7 +4,7 @@ use {
 };
 
 impl MacosBackend {
-    pub fn handle_raw_event(&mut self, raw_event: NSEvent) -> Option<Event> {
+    pub fn handle_raw_event(&mut self, raw_event: NSEvent) {
         let event_window = WindowHandle(raw_event.window_number() as usize);
         match raw_event.event_type() {
             NSEventType::AppKitDefined => match raw_event.event_subtype() {
@@ -14,11 +14,11 @@ impl MacosBackend {
                     window.recalculate_borders();
                     let origin = window.frame().origin;
 
-                    Some(Event {
+                    self.event_queue.push_back(Event {
                         time: Duration::ZERO,
                         window: event_window,
                         kind: EventKind::Moved(origin.x as i32, origin.y as i32),
-                    })
+                    });
                 }
                 NSEventSubtype::ApplicationActivated | NSEventSubtype::ApplicationDeactivated => {
                     self.nsapp.send_event(raw_event);
@@ -26,25 +26,22 @@ impl MacosBackend {
                         .get_mut(self.frontmost_window.as_ref().unwrap())
                         .unwrap()
                         .make_main();
-                    None
                 }
                 NSEventSubtype::Undocumented(_) | NSEventSubtype::WindowExposed => {
                     self.nsapp.send_event(raw_event);
-                    None
                 }
-                _ => None,
+                _ => {}
             },
             NSEventType::SystemDefined => {
                 if let NSEventSubtype::Undocumented(_) = raw_event.event_subtype() {
                     self.nsapp.send_event(raw_event)
                 }
-
-                None
             }
 
             NSEventType::MouseMoved
             | NSEventType::LeftMouseDragged
-            | NSEventType::RightMouseDragged => {
+            | NSEventType::RightMouseDragged
+            | NSEventType::OtherMouseDragged => {
                 self.nsapp.send_event(raw_event);
 
                 let NSPoint { x, y } = NSEvent::mouse_location();
@@ -56,30 +53,30 @@ impl MacosBackend {
                         .resize_border(resize_border, Point::Screen(x as i32, y as i32))
                 }
 
-                Some(Event {
+                self.event_queue.push_back(Event {
                     // TODO: Time
                     time: Duration::ZERO,
                     window: event_window,
                     kind: EventKind::Mouse(MouseEvent::CursorMove(x as i32, y as i32)),
-                })
+                });
             }
             NSEventType::MouseEntered => {
                 let NSPoint { x, y } = self.windows.get(&event_window.0).unwrap().mouse_location();
-                Some(Event {
+                self.event_queue.push_back(Event {
                     // TODO: Time
                     time: Duration::ZERO,
                     window: event_window,
                     kind: EventKind::Mouse(MouseEvent::CursorIn(x as i32, y as i32)),
-                })
+                });
             }
             NSEventType::MouseExited => {
                 let NSPoint { x, y } = self.windows.get(&event_window.0).unwrap().mouse_location();
-                Some(Event {
+                self.event_queue.push_back(Event {
                     // TODO: Time
                     time: Duration::ZERO,
                     window: event_window,
                     kind: EventKind::Mouse(MouseEvent::CursorOut(x as i32, y as i32)),
-                })
+                });
             }
 
             NSEventType::LeftMouseDown => {
@@ -93,7 +90,7 @@ impl MacosBackend {
                     self.nsapp.send_event(raw_event);
                 }
 
-                Some(Event {
+                self.event_queue.push_back(Event {
                     // TODO: Time
                     time: Duration::ZERO,
                     window: event_window,
@@ -102,12 +99,12 @@ impl MacosBackend {
                         mouse_loc.x as i32,
                         mouse_loc.y as i32,
                     )),
-                })
+                });
             }
             NSEventType::LeftMouseUp => {
                 self.resize_direction = None;
                 let NSPoint { x, y } = self.windows.get(&event_window.0).unwrap().mouse_location();
-                Some(Event {
+                self.event_queue.push_back(Event {
                     // TODO: Time
                     time: Duration::ZERO,
                     window: event_window,
@@ -116,11 +113,11 @@ impl MacosBackend {
                         x as i32,
                         y as i32,
                     )),
-                })
+                });
             }
             NSEventType::RightMouseDown => {
                 let NSPoint { x, y } = self.windows.get(&event_window.0).unwrap().mouse_location();
-                Some(Event {
+                self.event_queue.push_back(Event {
                     // TODO: Time
                     time: Duration::ZERO,
                     window: event_window,
@@ -129,11 +126,11 @@ impl MacosBackend {
                         x as i32,
                         y as i32,
                     )),
-                })
+                });
             }
             NSEventType::RightMouseUp => {
                 let NSPoint { x, y } = self.windows.get(&event_window.0).unwrap().mouse_location();
-                Some(Event {
+                self.event_queue.push_back(Event {
                     // TODO: Time
                     time: Duration::ZERO,
                     window: event_window,
@@ -142,7 +139,39 @@ impl MacosBackend {
                         x as i32,
                         y as i32,
                     )),
-                })
+                });
+            }
+            NSEventType::OtherMouseDown => {
+                let NSPoint { x, y } = self.windows.get(&event_window.0).unwrap().mouse_location();
+                let button_number = raw_event.mouse_button_number();
+                let button = if button_number == 2 {
+                    MouseButton::Middle
+                } else {
+                    MouseButton::Other(button_number as _)
+                };
+
+                self.event_queue.push_back(Event {
+                    // TODO: Time
+                    time: Duration::ZERO,
+                    window: event_window,
+                    kind: EventKind::Mouse(MouseEvent::ButtonPress(button, x as i32, y as i32)),
+                });
+            }
+            NSEventType::OtherMouseUp => {
+                let NSPoint { x, y } = self.windows.get(&event_window.0).unwrap().mouse_location();
+                let button_number = raw_event.mouse_button_number();
+                let button = if button_number == 2 {
+                    MouseButton::Middle
+                } else {
+                    MouseButton::Other(button_number as _)
+                };
+
+                self.event_queue.push_back(Event {
+                    // TODO: Time
+                    time: Duration::ZERO,
+                    window: event_window,
+                    kind: EventKind::Mouse(MouseEvent::ButtonRelease(button, x as i32, y as i32)),
+                });
             }
 
             NSEventType::KeyDown => {
@@ -154,27 +183,54 @@ impl MacosBackend {
                 } else {
                     KeyboardEvent::KeyPress(key)
                 };
-                Some(Event {
+                self.event_queue.push_back(Event {
                     // TODO: Time
                     time: Duration::ZERO,
                     window: event_window,
                     kind: EventKind::Keyboard(event_type),
-                })
+                });
             }
             NSEventType::KeyUp => {
                 let key = super::keysym::to_keycode(raw_event.key_code()).unwrap();
 
-                Some(Event {
+                self.event_queue.push_back(Event {
                     // TODO: Time
                     time: Duration::ZERO,
                     window: event_window,
                     kind: EventKind::Keyboard(KeyboardEvent::KeyRelease(key)),
-                })
+                });
+            }
+            NSEventType::FlagsChanged => {
+                let Some(keycode) = super::keysym::to_keycode(raw_event.key_code()) else {
+                    println!(
+                        "Lokinit macOS: Warning: Unknown key flag `{}`",
+                        raw_event.key_code()
+                    );
+                    return;
+                };
+                match self.active_modifiers.contains(&keycode) {
+                    true => {
+                        self.active_modifiers.remove(&keycode);
+                        self.event_queue.push_back(Event {
+                            // TODO: Time
+                            time: Duration::ZERO,
+                            window: event_window,
+                            kind: EventKind::Keyboard(KeyboardEvent::KeyRelease(keycode)),
+                        });
+                    }
+                    false => {
+                        self.active_modifiers.insert(keycode);
+                        self.event_queue.push_back(Event {
+                            // TODO: Time
+                            time: Duration::ZERO,
+                            window: event_window,
+                            kind: EventKind::Keyboard(KeyboardEvent::KeyPress(keycode)),
+                        });
+                    }
+                }
             }
 
-            NSEventType::Pressure => None,
-
-            _ => None,
+            _ => {}
         }
     }
 }

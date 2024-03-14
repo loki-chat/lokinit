@@ -142,6 +142,8 @@ pub mod ffi {
         fn mouse_location() -> NSPoint;
         #[selector = "isARepeat"]
         fn is_repeat(&self) -> ObjcBool;
+        #[selector = "buttonNumber"]
+        fn mouse_button_number(&self) -> isize;
     }
 
     // Without this, Rust won't link to AppKit and AppKit classes won't get loaded.
