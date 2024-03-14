@@ -1,13 +1,12 @@
 use std::ffi::{c_char, CStr};
 use std::fmt;
+use std::os::raw::c_void;
 use std::rc::Rc;
 use std::{ffi::CString, ptr::NonNull};
 
-use self::ffi::{LibWaylandClient, WlCompositor, WlDisplay, WlRegistry, WlRegistryListener};
+use loki_linux::wayland::{LibWaylandClient, WlCompositor, WlDisplay, WlRegistry, WlRegistryListener};
+use loki_linux::LoadingError;
 
-use super::LoadingError;
-
-mod ffi;
 mod requests;
 
 #[derive(Debug)]
@@ -100,33 +99,29 @@ impl RegistryState {
 }
 
 unsafe extern "C" fn global_registry_handler(
-    data: *mut RegistryState,
+    data: *mut c_void,
     registry: *mut WlRegistry,
     id: u32,
     interface_name: *const c_char,
     version: u32,
 ) {
-    let Some(data) = data.as_mut() else {
+    let Some(data) = data.cast::<RegistryState>().as_mut() else {
         // No data? ',:v
         return;
     };
 
     let interface_name = CStr::from_ptr(interface_name).to_str().unwrap().to_owned();
     if interface_name == "wl_compositor" {
-        let interface = data.wl.wl_registry_interface;
-        data.compositor = data.wl.wl_registry_bind(registry, id, interface, version) as _;
+        //let interface = data.wl.wl_registry_interface;
+        //data.compositor = data.wl.wl_registry_bind(registry, id, interface, version) as _;
+        todo!()
     }
 }
 
 unsafe extern "C" fn global_registry_remover(
-    _data: *mut RegistryState,
+    _data: *mut c_void,
     _registry: *mut WlRegistry,
     id: u32,
 ) {
-    // let Some(data) = data.as_ref() else {
-    //     // No data? ',:v
-    //     return;
-    // };
-
     println!("Removing object {id} (not really)");
 }
