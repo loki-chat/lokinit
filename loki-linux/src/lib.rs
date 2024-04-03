@@ -22,12 +22,12 @@ impl Library {
     /// Usually, Linux libraries are in the form `lib<name>.so`.
     ///
     /// This function *will* append the `lib` prefix and `.so` extension for you, so don't do it yourself.
-    pub fn new(name: &str) -> Result<Self, Rc<str>> {
+    pub fn new(name: &str) -> Result<Self, LoadingError> {
         let c_str = CString::new(format!("lib{}.so", name)).unwrap();
         let lib = unsafe { dlopen(c_str.as_ptr(), RTLD_NOW) };
 
         if lib.is_null() {
-            Err(get_dlerror().unwrap())
+            Err(LoadingError::Library(get_dlerror().unwrap()))
         } else {
             Ok(Self {
                 handle: unsafe { NonNull::new_unchecked(lib) },
@@ -35,12 +35,12 @@ impl Library {
         }
     }
 
-    pub fn get_sym<F: Sized>(&self, sym: &str) -> Result<F, Rc<str>> {
+    pub fn get_sym<F: Sized>(&self, sym: &str) -> Result<F, LoadingError> {
         let c_str = CString::new(sym).unwrap();
         let sym = unsafe { dlsym(self.handle.as_ptr(), c_str.as_ptr()) };
 
         if sym.is_null() {
-            Err(get_dlerror().unwrap())
+            Err(LoadingError::Symbol(get_dlerror().unwrap()))
         } else {
             Ok(unsafe { std::mem::transmute_copy::<_, F>(&sym) })
         }
@@ -69,24 +69,26 @@ impl fmt::Display for LoadingError {
 macro_rules! library {
     (
         [ $lib:ident <-> $name:literal ] ;
+        $( { $( pub $var:ident : $vartype:ty );* ; } )?
         $( pub fn $fn:ident $args:tt $(-> $res:ty)? );* ;
     ) => {
         pub struct $lib {
+            $( $(pub $var: $vartype,)* )?
             $(pub $fn: unsafe extern "C" fn$args$( -> $res)?,)*
         }
 
         impl $lib {
             /// Instantiates this library.
-            /// 
+            ///
             /// # Safety
-            /// 
+            ///
             /// This method calls some `dlopen` functions through FFI.
             pub unsafe fn new() -> Result<Self, $crate::LoadingError> {
-                let lib = $crate::Library::new($name)
-                    .map_err($crate::LoadingError::Library)?;
+                let lib = $crate::Library::new($name)?;
 
                 Ok(Self {
-                    $($fn: lib.get_sym(stringify!($fn)).map_err($crate::LoadingError::Symbol)?,)*
+                    $( $($var: lib.get_sym(stringify!($var))?,)* )?
+                    $($fn: lib.get_sym(stringify!($fn))?,)*
                 })
             }
         }

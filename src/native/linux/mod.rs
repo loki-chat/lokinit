@@ -18,8 +18,18 @@ impl LokinitBackend for LinuxBackend {
     where
         Self: Sized + 'static,
     {
-        // TODO: wayland backend
-        Self::X11(X11Backend::init().unwrap())
+        match std::env::var("LOKINIT_BACKEND") {
+            Ok(x) if x == "wayland" => Self::Wayland(WaylandBackend::init().unwrap()),
+            Ok(x) if x == "xlib" => Self::X11(X11Backend::init().unwrap()),
+
+            _ => match WaylandBackend::init() {
+                Ok(x) => Self::Wayland(x),
+                Err(why) => {
+                    eprintln!("Failed to initialize wayland backend: {why:?}");
+                    Self::X11(X11Backend::init().unwrap())
+                }
+            },
+        }
     }
 
     fn create_window(&mut self, builder: WindowBuilder) -> Result<WindowHandle, CreateWindowError> {
