@@ -4,7 +4,10 @@ use std::os::raw::c_void;
 use std::rc::Rc;
 use std::{ffi::CString, ptr::NonNull};
 
-use loki_linux::wayland::{LibWaylandClient, WlCompositor, WlDisplay, WlRegistry, WlRegistryListener};
+use loki_linux::wayland::interfaces::wl_compositor::WlCompositor;
+use loki_linux::wayland::interfaces::wl_display::WlDisplay;
+use loki_linux::wayland::interfaces::wl_registry::WlRegistry;
+use loki_linux::wayland::{LibWaylandClient, WlRegistryListener};
 use loki_linux::LoadingError;
 
 mod requests;
@@ -47,25 +50,30 @@ pub struct WaylandBackend {
 impl WaylandBackend {
     pub fn init() -> Result<Self, WaylandInitError> {
         unsafe {
-            let wl = Rc::new(LibWaylandClient::new()?);
-
             let display_env =
                 std::env::var("WAYLAND_DISPLAY").map_err(|_| WaylandInitError::NoDisplaySet)?;
 
             let display_cstr = CString::new(display_env.clone())
                 .map_err(|_| WaylandInitError::InvalidDisplayFormat)?;
+
+            let wl = Rc::new(LibWaylandClient::new()?);
+
             let display = (wl.wl_display_connect)(display_cstr.as_ptr());
             let display =
                 NonNull::new(display).ok_or(WaylandInitError::CannotOpenDisplay(display_env))?;
 
-            let mut listener = Box::new(WlRegistryListener::new(
+            let mut listener = Box::new(WlRegistryListener {
                 global_registry_handler,
                 global_registry_remover,
-            ));
+            });
 
             let registry = wl.wl_display_get_registry(display.as_ptr());
             let mut registry_state = Box::new(RegistryState::new(wl.clone()));
-            wl.wl_registry_add_listener(registry, listener.as_mut(), registry_state.as_mut());
+            wl.wl_registry_add_listener(
+                registry,
+                listener.as_mut() as *mut _ as _,
+                registry_state.as_mut() as *mut _ as _,
+            );
 
             (wl.wl_display_roundtrip)(display.as_ptr());
 
@@ -112,8 +120,8 @@ unsafe extern "C" fn global_registry_handler(
 
     let interface_name = CStr::from_ptr(interface_name).to_str().unwrap().to_owned();
     if interface_name == "wl_compositor" {
-        //let interface = data.wl.wl_registry_interface;
-        //data.compositor = data.wl.wl_registry_bind(registry, id, interface, version) as _;
+        let interface = data.wl.wl_registry_interface;
+        data.compositor = data.wl.wl_registry_bind(registry, id, interface, version) as _;
         todo!()
     }
 }
