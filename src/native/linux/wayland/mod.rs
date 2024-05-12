@@ -1,135 +1,89 @@
-use std::ffi::{c_char, CStr};
-use std::fmt;
-use std::os::raw::c_void;
-use std::rc::Rc;
-use std::{ffi::CString, ptr::NonNull};
+use {
+    self::{display_handler::DisplayEventListener, registry_handler::RegistryEventListener},
+    crate::{
+        event::Event,
+        lok::{CreateWindowError, LokinitBackend},
+        prelude::{Monitor, WindowBuilder, WindowHandle},
+        window::ScreenMode,
+    },
+    loki_linux::wayland::{
+        interfaces::{
+            callback::Callback, compositor::Compositor, display::WaylandDisplay,
+            registry::WaylandRegistry, xdg::XdgWmBase,
+        },
+        WaylandClient,
+    },
+    std::{
+        cell::{Cell, RefCell},
+        rc::Rc,
+        thread,
+        time::Duration,
+    },
+};
 
-use loki_linux::wayland::interfaces::wl_compositor::WlCompositor;
-use loki_linux::wayland::interfaces::wl_display::WlDisplay;
-use loki_linux::wayland::interfaces::wl_registry::WlRegistry;
-use loki_linux::wayland::{LibWaylandClient, WlRegistryListener};
-use loki_linux::LoadingError;
-
-mod requests;
-
-#[derive(Debug)]
-pub enum WaylandInitError {
-    NoLibWayland(LoadingError),
-    NoDisplaySet,
-    InvalidDisplayFormat,
-    CannotOpenDisplay(String),
-}
-
-impl std::error::Error for WaylandInitError {}
-
-impl fmt::Display for WaylandInitError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::NoLibWayland(err) => write!(f, "Cannot find libwayland-client: {:?}", err),
-            Self::NoDisplaySet => write!(f, "WAYLAND_DISPLAY environment variable is not set"),
-            Self::InvalidDisplayFormat => write!(f, "WAYLAND_DISPLAY is not a valid C string"),
-            Self::CannotOpenDisplay(display) => {
-                write!(f, "Cannot find Wayland display: {:?}", display)
-            }
-        }
-    }
-}
-
-impl From<LoadingError> for WaylandInitError {
-    fn from(value: LoadingError) -> Self {
-        Self::NoLibWayland(value)
-    }
-}
+pub mod display_handler;
+pub mod registry_handler;
 
 pub struct WaylandBackend {
-    wl: Rc<LibWaylandClient>,
-    display: NonNull<WlDisplay>,
-    listener: Box<WlRegistryListener>,
+    client: WaylandClient,
+    state: Rc<RefCell<WaylandState>>,
+}
+
+#[derive(Default)]
+pub struct WaylandState {
+    pub compositor: Option<Compositor>,
+    pub xdg_wm_base: Option<XdgWmBase>,
 }
 
 impl WaylandBackend {
-    pub fn init() -> Result<Self, WaylandInitError> {
-        unsafe {
-            let display_env =
-                std::env::var("WAYLAND_DISPLAY").map_err(|_| WaylandInitError::NoDisplaySet)?;
+    pub fn new() -> Option<Self> {
+        let client = WaylandClient::new()?;
+        let state = Rc::new(RefCell::new(WaylandState::default()));
+        let this = Self {
+            client,
+            state: state.clone(),
+        };
 
-            let display_cstr = CString::new(display_env.clone())
-                .map_err(|_| WaylandInitError::InvalidDisplayFormat)?;
+        WaylandDisplay.set_listener(DisplayEventListener {});
+        WaylandRegistry.set_listener(RegistryEventListener { state });
 
-            let wl = Rc::new(LibWaylandClient::new()?);
+        this.block_until_next_event();
 
-            let display = (wl.wl_display_connect)(display_cstr.as_ptr());
-            let display =
-                NonNull::new(display).ok_or(WaylandInitError::CannotOpenDisplay(display_env))?;
+        Some(this)
+    }
 
-            let mut listener = Box::new(WlRegistryListener {
-                global_registry_handler,
-                global_registry_remover,
-            });
+    pub fn block_until_next_event(&self) {
+        let finished = Rc::new(Cell::new(false));
+        let finished_clone = finished.clone();
+        WaylandDisplay.sync(Callback::new(move |_| finished_clone.set(true)));
 
-            let registry = wl.wl_display_get_registry(display.as_ptr());
-            let mut registry_state = Box::new(RegistryState::new(wl.clone()));
-            wl.wl_registry_add_listener(
-                registry,
-                listener.as_mut() as *mut _ as _,
-                registry_state.as_mut() as *mut _ as _,
-            );
-
-            (wl.wl_display_roundtrip)(display.as_ptr());
-
-            Ok(Self {
-                wl,
-                display,
-                listener,
-            })
+        while !finished.get() {
+            thread::sleep(Duration::from_millis(5));
+            self.client.read_message();
         }
+
+        println!("Finished [S Y N C]")
     }
 }
 
-impl Drop for WaylandBackend {
-    fn drop(&mut self) {
-        unsafe { (self.wl.wl_display_disconnect)(self.display.as_ptr()) };
+impl LokinitBackend for WaylandBackend {
+    fn init() -> Self {
+        Self::new().unwrap()
     }
-}
 
-pub struct RegistryState {
-    pub wl: Rc<LibWaylandClient>,
-    pub compositor: *mut WlCompositor,
-}
-
-impl RegistryState {
-    fn new(wl: Rc<LibWaylandClient>) -> Self {
-        Self {
-            wl,
-            compositor: std::ptr::null_mut(),
-        }
+    fn create_window(&mut self, builder: WindowBuilder) -> Result<WindowHandle, CreateWindowError> {
+        todo!("Create window")
     }
-}
-
-unsafe extern "C" fn global_registry_handler(
-    data: *mut c_void,
-    registry: *mut WlRegistry,
-    id: u32,
-    interface_name: *const c_char,
-    version: u32,
-) {
-    let Some(data) = data.cast::<RegistryState>().as_mut() else {
-        // No data? ',:v
-        return;
-    };
-
-    let interface_name = CStr::from_ptr(interface_name).to_str().unwrap().to_owned();
-    if interface_name == "wl_compositor" {
-        let interface = data.wl.wl_registry_interface;
-        data.compositor = data.wl.wl_registry_bind(registry, id, interface, version) as _;
-        todo!()
+    fn close_window(&mut self, handle: WindowHandle) {
+        todo!("Close window")
     }
-}
-
-unsafe extern "C" fn global_registry_remover(
-    _data: *mut c_void,
-    _registry: *mut WlRegistry,
-    id: u32,
-) {
-    println!("Removing object {id} (not really)");
+    fn fetch_monitors(&mut self) -> Vec<Monitor> {
+        todo!("Fetch monitors")
+    }
+    fn poll_event(&mut self) -> Option<Event> {
+        todo!("Poll event")
+    }
+    fn set_screen_mode(&mut self, handle: WindowHandle, screen_mode: ScreenMode) {
+        todo!("Set screen mode")
+    }
 }

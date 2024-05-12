@@ -1,37 +1,63 @@
-use std::ffi::{c_int, c_void};
+use super::buffer::Buffer;
 
-use crate::wayland::{LibWaylandClient, NULLPTR};
+/// A pool of memory shared between the client and Wayland compositor. This pool can create [`Buffer`]s.
+pub struct SharedMemoryPool {}
+impl SharedMemoryPool {
+    /// Creates a [`Buffer`], starting `offset` bytes into the memory pool, storing `width` x `height` pixels in the
+    /// `format` format. `stride` determines the number of bytes from the beginning of one row to the beginning of the
+    /// next.
+    pub fn create_buffer(
+        &self,
+        offset: i32,
+        width: i32,
+        height: i32,
+        stride: i32,
+        format: Format,
+    ) -> Buffer {
+        todo!()
+    }
 
-use super::wl_shm_pool::WlShmPool;
+    /// Destroys the shared memory pool. After all buffers created in this pool are gone, the pool's memory will
+    /// be released.
+    pub fn destroy(self) {
+        todo!()
+    }
 
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum WlShmError {
-    /// buffer format is not known
-    InvalidFormat = 0,
-    /// invalid size or stride during pool or buffer creation
-    InvalidStride = 1,
-    /// mmapping the file descriptor failed
-    InvalidFd = 2,
+    /// Changes the size of this pool.
+    pub fn resize(&self, new_size: i32) {
+        todo!()
+    }
 }
 
-/// Pixel formats
+/// A global singleton that allows you to create [`SharedMemoryPool`]s.
 ///
-/// This describes the memory layout of an individual pixel.
-///
-/// All renderers should support argb8888 and xrgb8888 but any other
-/// formats are optional and may not be supported by the particular
-/// renderer in use.
-///
-/// The drm format codes match the macros defined in drm_fourcc.h, except
-/// argb8888 and xrgb8888. The formats actually supported by the compositor
-/// will be reported by the format event.
-///
-/// For all wl_shm formats and unless specified in another protocol
-/// extension, pre-multiplied alpha is used for pixel values.
+/// After this object is bound, it will send [`SharedMemoryListener::format`] events for every pixel format the
+/// Wayland compositor supports.
+pub struct SharedMemory {}
+impl SharedMemory {
+    pub fn create_pool(&self, file_descriptor: *mut (), size: i32) -> SharedMemoryPool {
+        todo!()
+    }
+}
+
+pub trait SharedMemoryListener {
+    /// Informs the client of a valid/supported pixel format.
+    fn format(&self, format: Format);
+}
+
+pub enum SharedMemoryError {
+    /// An unsupported buffer format was used.
+    InvalidFormat,
+    /// The size or stride was bad while creating a pool or buffer.
+    InvalidStride,
+    /// Calling `mmap` on the provided file descriptor failed.
+    InvalidFileDescriptor,
+}
+
+/// The pixel format for a [`Buffer`].
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum WlShmFormat {
+pub enum Format {
     /// 32-bit ARGB format, [31:0] A:R:G:B 8:8:8:8 little endian
     Argb8888 = 0,
     /// 32-bit RGB format, [31:0] x:R:G:B 8:8:8:8 little endian
@@ -236,54 +262,4 @@ pub enum WlShmFormat {
     Argb16161616 = 0x38345241,
     /// [63:0] A:B:G:R 16:16:16:16 little endian
     Abgr16161616 = 0x38344241,
-}
-
-pub const WL_SHM_CREATE_POOL: u32 = 0;
-pub const WL_SHM_FORMAT_SINCE_VERSION: u32 = 1;
-pub const WL_SHM_CREATE_POOL_SINCE_VERSION: u32 = 1;
-
-#[repr(C)]
-pub struct WlShm([u8; 0]);
-
-#[repr(C)]
-pub struct WlShmListener {
-    pub done: Option<
-        unsafe extern "C" fn(data: *mut c_void, wl_shm: *mut WlShm, format: u32),
-    >,
-}
-
-#[allow(clippy::missing_safety_doc)]
-impl LibWaylandClient {
-    pub unsafe fn wl_shm_add_listener(
-        &self,
-        wl_shm: *mut WlShm,
-        listener: *const WlShmListener,
-        data: *mut c_void,
-    ) -> c_int {
-        (self.wl_proxy_add_listener)(wl_shm as _, listener as _, data)
-    }
-
-    pub unsafe fn wl_shm_set_user_data(
-        &self,
-        wl_shm: *mut WlShm,
-        user_data: *mut c_void,
-    ) {
-        (self.wl_proxy_set_user_data)(wl_shm as _, user_data)
-    }
-
-    pub unsafe fn wl_shm_get_user_data(&self, wl_shm: *mut WlShm) -> *mut c_void {
-        (self.wl_proxy_get_user_data)(wl_shm as _)
-    }
-
-    pub unsafe fn wl_shm_get_version(&self, wl_shm: *mut WlShm) -> u32 {
-        (self.wl_proxy_get_version)(wl_shm as _)
-    }
-
-    pub unsafe fn wl_shm_destroy(&self, wl_shm: *mut WlShm) {
-        (self.wl_proxy_destroy)(wl_shm as _)
-    }
-
-	pub unsafe fn wl_shm_create_pool(&self, wl_shm: *mut WlShm, fd: i32, size: i32) -> *mut WlShmPool {
-		(self.wl_proxy_marshal_flags)(wl_shm as _, WL_SHM_CREATE_POOL, self.wl_shm_pool_interface, (self.wl_proxy_get_version)(wl_shm as _), 0, NULLPTR, fd, size) as _
-	}
 }
