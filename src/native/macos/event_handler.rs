@@ -9,16 +9,18 @@ impl MacosBackend {
         match raw_event.event_type() {
             NSEventType::AppKitDefined => match raw_event.event_subtype() {
                 NSEventSubtype::WindowMoved => {
-                    self.nsapp.send_event(raw_event);
-                    let window = self.windows.get_mut(&event_window.0).unwrap();
-                    window.recalculate_borders();
-                    let origin = window.frame().origin;
+                    // TODO: Figure out why this is sometimes None
+                    if let Some(window) = self.windows.get_mut(&event_window.0) {
+                        self.nsapp.send_event(raw_event);
+                        window.recalculate_borders();
+                        let origin = window.frame().origin;
 
-                    self.event_queue.push_back(Event {
-                        time: Duration::ZERO,
-                        window: event_window,
-                        kind: EventKind::Moved(origin.x as i32, origin.y as i32),
-                    });
+                        self.event_queue.push_back(Event {
+                            time: Duration::ZERO,
+                            window: event_window,
+                            kind: EventKind::Moved(origin.x as i32, origin.y as i32),
+                        });
+                    }
                 }
                 NSEventSubtype::ApplicationActivated | NSEventSubtype::ApplicationDeactivated => {
                     self.nsapp.send_event(raw_event);

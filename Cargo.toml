@@ -24,8 +24,13 @@ winapi = { version = "0.3.9", features = [
     "errhandlingapi",
 ] }
 
+[dev-dependencies]
+gl = "0.14.0"
+loki-draw = { git = "https://github.com/loki-chat/loki-draw.git" }
+
 [features]
-default = []
+default = ["opengl"]
+opengl = []
 
 [workspace]
 members = ["loki-linux", "loki-mac"]

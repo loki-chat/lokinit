@@ -5,6 +5,11 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::{native::DefaultLokinitBackend, window::ScreenMode};
+#[cfg(feature = "opengl")]
+use {
+    crate::gl::{GLSurface, OpenGLConfig},
+    std::ffi::{c_char, c_void},
+};
 
 use {
     crate::{
@@ -40,19 +45,12 @@ pub trait LokinitBackend {
 
     fn set_screen_mode(&mut self, handle: WindowHandle, screen_mode: ScreenMode);
 
-    // TODO: implement monitor fetching in native backends
-    fn fetch_monitors(&mut self) -> Vec<Monitor> {
-        unimplemented!()
-    }
+    fn fetch_monitors(&mut self) -> Vec<Monitor>;
 
     #[cfg(feature = "opengl")]
-    fn load_opengl(&mut self) -> crate::native::GLDisplay;
+    fn create_window_surface(&mut self, window: WindowHandle, cfg: OpenGLConfig) -> GLSurface;
     #[cfg(feature = "opengl")]
-    fn create_window_surface(
-        &self,
-        window: WindowHandle,
-        display: &crate::native::GLDisplay,
-    ) -> crate::native::GLWindowSurface;
+    fn load_opengl_func(&mut self, proc_name: *const c_char) -> Option<*mut c_void>;
 }
 
 thread_local! {
@@ -110,13 +108,10 @@ pub fn fetch_monitors() -> Vec<Monitor> {
 }
 
 #[cfg(feature = "opengl")]
-pub fn load_opengl() -> crate::native::GLDisplay {
-    with(|instance| instance.load_opengl())
+fn create_window_surface(window: WindowHandle, cfg: OpenGLConfig) -> GLSurface {
+    with(|instance| instance.create_window_surface(window, cfg))
 }
 #[cfg(feature = "opengl")]
-pub fn create_window_surface(
-    window: WindowHandle,
-    display: &crate::native::GLDisplay,
-) -> crate::native::GLWindowSurface {
-    with(|instance| instance.create_window_surface(window, display))
+pub fn load_opengl_func(name: *const c_char) -> Option<*mut c_void> {
+    with(|instance| instance.load_opengl_func(name))
 }

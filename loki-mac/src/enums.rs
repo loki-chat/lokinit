@@ -175,3 +175,84 @@ pub enum NSEventModifierFlags {
     /// A function key was pressed.
     Function = 1 << 23,
 }
+
+#[repr(usize)]
+pub enum NSStringEncoding {
+    ASCII = 1,
+    NEXTSTEP = 2,
+    JapaneseEUC = 3,
+    UTF8 = 4,
+    ISOLatin1 = 5,
+    AdobeSymbol = 6,
+    NonLossyASCII = 7,
+    ShiftJIS = 8,
+    Latin2 = 9,
+    Unicode = 10,
+    WindowsCP1251 = 11,
+    WindowsCP1252 = 12,
+    WindowsCP1253 = 13,
+    WindowsCP1254 = 14,
+    WindowsCP1250 = 15,
+    ISO2022JP = 21,
+    MacOSRoman = 30,
+    // UTF16 is the same as Unicode, which will cause an error in Rust, but it's documented here
+    // just to match the enum 1:1.
+    // UTF16 = 10,
+    UTF16BigEndian = 0x90000100,
+    UTF16LittleEndian = 0x94000100,
+    UTF32 = 0x8c000100,
+    UTF32BigEndian = 0x98000100,
+    UTF32LittleEndian = 0x9c000100,
+    // Deprecated, but documented to match the enum 1:1.
+    // ProprietaryString = 65536
+}
+
+#[repr(u32)]
+pub enum NSOpenGLPFA {
+    Accelerated = 73,
+    AcceleratedCompute = 97,
+    AccumSize = 14,
+    AllRenderers = 1,
+    AllowOfflineRenderers = 96,
+    AlphaSize = 11,
+    AuxBuffers = 7,
+    AuxDepthStencil = 57,
+    BackingStore = 76,
+    ClosestPolicy = 74,
+    ColorFloat = 58,
+    ColorSize = 8,
+    Compliant = 83,
+    DepthSize = 12,
+    DoubleBuffer = 5,
+    FullScreen = 54,
+    MPSafe = 78,
+    MaximumPolicy = 52,
+    MinimumPolicy = 51,
+    MultiScreen = 81,
+    Multisample = 59,
+    NoRecovery = 72,
+    OffScreen = 53,
+    OpenGLProfile = 99,
+    PixelBuffer = 90,
+    RemotePixelBuffer = 91,
+    RendererID = 70,
+    Robust = 75,
+    SampleAlpha = 61,
+    SampleBuffers = 55,
+    Samples = 56,
+    ScreenMask = 84,
+    SingleRenderer = 71,
+    StencilSize = 13,
+    Stereo = 6,
+    Supersample = 60,
+    TripleBuffer = 3,
+    VirtualScreenCount = 128,
+    Window = 80,
+}
+#[repr(u32)]
+pub enum NSOpenGLProfile {
+    /// Pre-OpenGL 3.0
+    Legacy = 0x1000,
+    Core3_2 = 0x3200,
+    Core4_1 = 0x4100,
+}

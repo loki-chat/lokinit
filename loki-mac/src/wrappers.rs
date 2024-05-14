@@ -13,6 +13,17 @@ use {
 #[repr(transparent)]
 pub struct NSEvent(ffi::NSEvent);
 impl NSEvent {
+    pub fn characters(&self) -> Option<&str> {
+        let chars = self.0.characters();
+        // TODO: Create some kind of "from_raw_immut" in objective-rust so we don't have to do this
+        let chars = chars.cast_mut();
+        let nsstring = unsafe { ffi::NSString::from_raw(NonNull::new(chars)?) };
+
+        // Safety: The string will be valid for as long as this event exists... so as long as there's
+        // not another issue with this NSEvent instance, this is safe.
+        unsafe { Some(nsstring.as_str()) }
+    }
+
     #[inline(always)]
     pub fn event_subtype(&self) -> enums::NSEventSubtype {
         self.0.event_subtype().into()
@@ -101,7 +112,15 @@ impl NSWindow {
     }
 
     pub fn set_title(&mut self, title: &str) {
-        let title: ffi::NSString = title.into();
+        // TODO: Debug why windows crash when setting an empty title
+        // I can't tell if it's an issue with how we make the NSString or it just
+        // doesn't accept empty strings. Either way it exits with an error
+        // suggesting we forgot to nest alloc and init.
+        let title: ffi::NSString = if title.len() > 0 {
+            title.into()
+        } else {
+            " ".into()
+        };
         self.0.set_title(title.into_raw().as_ptr())
     }
 

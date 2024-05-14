@@ -1,14 +1,13 @@
-use {
-    objective_rust::objrs,
-    std::{ffi::CString, ptr::NonNull},
-};
-
+pub mod dynload;
 pub mod enums;
 pub mod wrappers;
 
+use objective_rust::objrs;
 pub use {
     enums::*,
-    ffi::{NSDate, NSPoint, NSRect, NSSize},
+    ffi::{
+        NSDate, NSOpenGLContext, NSOpenGLPixelFormat, NSOpenGLView, NSPoint, NSRect, NSSize, NSView,
+    },
     wrappers::*,
 };
 
@@ -17,7 +16,10 @@ pub mod ffi {
     use {
         crate::enums::*,
         objective_rust::ObjcBool,
-        std::{ffi::c_char, ptr::NonNull},
+        std::{
+            ffi::{c_char, CString},
+            ptr::{self, NonNull},
+        },
     };
 
     #[repr(C)]
@@ -38,12 +40,58 @@ pub mod ffi {
         pub origin: NSPoint,
         pub size: NSSize,
     }
+    impl NSRect {
+        pub fn contains(&self, x: i32, y: i32) -> bool {
+            (x >= self.origin.x as i32)
+                && (x <= self.origin.x as i32 + self.size.width as i32)
+                && (y >= self.origin.y as i32)
+                && (y <= self.origin.y as i32 + self.size.height as i32)
+        }
+    }
 
     extern "objc" {
         type NSString;
 
         #[selector = "stringWithUTF8String:"]
-        fn new(string: *const c_char) -> *mut Self;
+        fn new_with_string(string: *const c_char) -> *mut Self;
+        #[selector = "cStringUsingEncoding:"]
+        fn to_c_string(&self, encoding: NSStringEncoding) -> *const c_char;
+        #[selector = "lengthOfBytesUsingEncoding:"]
+        fn length_of_bytes(&self, encoding: NSStringEncoding) -> usize;
+    }
+    impl From<String> for NSString {
+        fn from(value: String) -> Self {
+            Self::from(value.as_str())
+        }
+    }
+    impl From<&str> for NSString {
+        fn from(value: &str) -> Self {
+            let string = CString::new(value).unwrap();
+            let instance = NSString::new_with_string(string.as_ptr());
+
+            unsafe { NSString::from_raw(NonNull::new(instance).unwrap()) }
+        }
+    }
+    impl NSString {
+        /// # Safety
+        /// The returned string must not be borrowed for longer than this NSString exists - in other
+        /// words, `'a` must not outlive this string.
+        pub unsafe fn as_str<'a>(&self) -> &'a str {
+            let c_string: *const u8 = self.to_c_string(crate::NSStringEncoding::UTF8).cast();
+            let len = self.len();
+            let buffer = std::slice::from_raw_parts(c_string, len);
+
+            unsafe { std::str::from_utf8_unchecked(buffer) }
+        }
+
+        #[inline(always)]
+        pub fn len(&self) -> usize {
+            self.length_of_bytes(NSStringEncoding::UTF8)
+        }
+        #[inline(always)]
+        pub fn is_empty(&self) -> bool {
+            self.len() == 0
+        }
     }
 
     /// https://developer.apple.com/documentation/foundation/nsrunloopmode?language=objc
@@ -125,6 +173,11 @@ pub mod ffi {
         fn set_title(&mut self, title: *mut NSStringInstance);
         fn center(&mut self);
         fn close(&self);
+
+        #[selector = "contentView"]
+        fn content_view(&self) -> NSView;
+        #[selector = "setContentView"]
+        fn set_content_view(&mut self, view: *mut NSViewInstance);
     }
 
     extern "objc" {
@@ -144,6 +197,81 @@ pub mod ffi {
         fn is_repeat(&self) -> ObjcBool;
         #[selector = "buttonNumber"]
         fn mouse_button_number(&self) -> isize;
+        #[selector = "characters"]
+        fn characters(&self) -> *const NSStringInstance;
+    }
+
+    extern "objc" {
+        type NSView;
+
+        fn alloc() -> *mut Self;
+        #[selector = "initWithFrame:"]
+        fn init(&mut self, size: NSRect);
+    }
+    impl NSView {
+        pub fn new(size: NSRect) -> Self {
+            let mut this = unsafe { Self::from_raw(NonNull::new(Self::alloc()).unwrap()) };
+            this.init(size);
+
+            this
+        }
+    }
+
+    extern "objc" {
+        type NSOpenGLView;
+
+        fn alloc() -> *mut Self;
+        #[selector = "defaultPixelFormat"]
+        fn default_pixel_format() -> NSOpenGLPixelFormat;
+        #[selector = "initWithFrame:pixelFormat:"]
+        fn init(&mut self, frame: NSRect, pixel_format: NSOpenGLPixelFormat);
+    }
+
+    extern "objc" {
+        type NSOpenGLPixelFormat;
+
+        fn alloc() -> *mut Self;
+        #[selector = "initWithAttributes:"]
+        fn init(&mut self, attributes: *const u32);
+        #[selector = "numberOfVirtualScreens"]
+        fn number_of_virtual_screens(&self) -> i32;
+    }
+    impl NSOpenGLPixelFormat {
+        pub fn new(attributes: &[u32]) -> Self {
+            let mut this = unsafe { Self::from_raw(NonNull::new(Self::alloc()).unwrap()) };
+            this.init(attributes as *const [u32] as *const u32);
+
+            this
+        }
+    }
+
+    extern "objc" {
+        type NSOpenGLContext;
+
+        fn alloc() -> *mut Self;
+        #[selector = "initWithFormat:shareContext:"]
+        fn init(
+            &mut self,
+            format: NSOpenGLPixelFormat,
+            share_context: *mut NSOpenGLContextInstance,
+        );
+        #[selector = "setView:"]
+        fn set_view(&mut self, view: *mut NSViewInstance);
+        #[selector = "makeCurrentContext"]
+        fn make_current(&self);
+        #[selector = "setFullScreen"]
+        fn set_fullscreen(&self);
+        fn update(&self);
+        #[selector = "flushBuffer"]
+        fn flush_buffer(&self);
+    }
+    impl NSOpenGLContext {
+        pub fn new(format: NSOpenGLPixelFormat) -> Self {
+            let mut this = unsafe { Self::from_raw(NonNull::new(Self::alloc()).unwrap()) };
+            this.init(format, ptr::null_mut());
+
+            this
+        }
     }
 
     // Without this, Rust won't link to AppKit and AppKit classes won't get loaded.
@@ -158,30 +286,12 @@ pub mod ffi {
         /// https://developer.apple.com/documentation/appkit/nsmodalpanelrunloopmode?language=objc
         pub static NSModalPanelRunLoopMode: NSRunLoopMode;
     }
-}
-
-impl From<String> for ffi::NSString {
-    fn from(value: String) -> Self {
-        let string = CString::new(value).unwrap();
-        let instance = ffi::NSString::new(string.as_ptr());
-
-        unsafe { ffi::NSString::from_raw(NonNull::new(instance).unwrap()) }
-    }
-}
-impl From<&str> for ffi::NSString {
-    fn from(value: &str) -> Self {
-        let string = CString::new(value).unwrap();
-        let instance = ffi::NSString::new(string.as_ptr());
-
-        unsafe { ffi::NSString::from_raw(NonNull::new(instance).unwrap()) }
-    }
-}
-
-impl ffi::NSRect {
-    pub fn contains(&self, x: i32, y: i32) -> bool {
-        (x >= self.origin.x as i32)
-            && (x <= self.origin.x as i32 + self.size.width as i32)
-            && (y >= self.origin.y as i32)
-            && (y <= self.origin.y as i32 + self.size.height as i32)
-    }
+    #[link(name = "Foundation", kind = "framework")]
+    extern "C" {}
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {}
+    #[link(name = "Metal", kind = "framework")]
+    extern "C" {}
+    #[link(name = "system")]
+    extern "C" {}
 }

@@ -1,4 +1,4 @@
-use crate::lok::MonitorId;
+use crate::lok::{self, MonitorId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct WindowPos {
@@ -45,7 +45,7 @@ pub enum ScreenMode {
     Fullscreen,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WindowBuilder {
     pub(crate) title: String,
     pub(crate) position: WindowPos,
@@ -114,6 +114,32 @@ impl WindowBuilder {
         self
     }
 }
+impl Default for WindowBuilder {
+    fn default() -> Self {
+        Self {
+            title: String::new(),
+            position: WindowPos { x: 200, y: 400 },
+            size: WindowSize {
+                width: 600,
+                height: 400,
+            },
+            monitor: None,
+            screen_mode: ScreenMode::Windowed,
+            centered: false,
+            resizable: true,
+            maximized: false,
+            transparent: false,
+            high_dpi: false,
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct WindowHandle(pub(crate) usize);
+impl WindowHandle {
+    pub fn close(self) {
+        lok::with(|backend| {
+            backend.close_window(self);
+        });
+    }
+}

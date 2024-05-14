@@ -1,12 +1,21 @@
 mod event_handler;
 mod keysym;
+#[cfg(feature = "opengl")]
+pub mod opengl;
 mod window;
 
+#[cfg(feature = "opengl")]
+use {
+    crate::gl::*,
+    loki_mac::dynload::{load_opengl, Library},
+    std::ffi::{c_char, c_void},
+};
 use {
     crate::{
         event::{Event, EventKind},
         keycode::KeyCode,
         lok::{CreateWindowError, LokinitBackend},
+        prelude::Monitor,
         window::{WindowBorder, WindowBuilder, WindowHandle},
     },
     loki_mac::*,
@@ -32,6 +41,9 @@ pub struct MacosBackend {
     pub active_modifiers: HashSet<KeyCode>,
     /// An underlying AppKit `NSApplication` instance.
     pub nsapp: NSApp,
+    /// The `OpenGL.framework` library, for loading OpenGL functions.
+    #[cfg(feature = "opengl")]
+    pub opengl: Library,
 }
 
 impl MacosBackend {
@@ -76,6 +88,8 @@ impl LokinitBackend for MacosBackend {
             resize_direction: None,
             active_modifiers: HashSet::default(),
             nsapp,
+            #[cfg(feature = "opengl")]
+            opengl: load_opengl(),
         }
     }
 
@@ -147,5 +161,40 @@ impl LokinitBackend for MacosBackend {
             );
             self.handle_raw_event(raw_event);
         }
+    }
+
+    fn fetch_monitors(&mut self) -> Vec<Monitor> {
+        todo!()
+    }
+
+    #[cfg(feature = "opengl")]
+    fn create_window_surface(
+        &mut self,
+        window_handle: WindowHandle,
+        cfg: OpenGLConfig,
+    ) -> GLSurface {
+        let window = self.windows.get_mut(&window_handle.0).unwrap();
+        let view = window.content_view();
+
+        let mut attrs = Vec::new();
+        attrs.push(NSOpenGLPFA::Accelerated as _);
+        attrs.push(NSOpenGLPFA::DoubleBuffer as _);
+        attrs.push(NSOpenGLPFA::OpenGLProfile as _);
+        attrs.push(NSOpenGLProfile::Core4_1 as _);
+        // Attributes must end in 0
+        attrs.push(0);
+        let pixel_format = NSOpenGLPixelFormat::new(&attrs);
+
+        let mut context = NSOpenGLContext::new(pixel_format);
+        context.set_view(view.into_raw().as_ptr());
+
+        GLSurface {
+            context,
+            window: window_handle,
+        }
+    }
+    #[cfg(feature = "opengl")]
+    fn load_opengl_func(&mut self, proc_name: *const c_char) -> Option<*mut c_void> {
+        self.opengl.load(proc_name)
     }
 }
