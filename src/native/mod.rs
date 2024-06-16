@@ -26,6 +26,7 @@ pub type DefaultLokinitBackend = linux::LinuxBackend;
 
 #[cfg(target_os = "macos")]
 pub type DefaultLokinitBackend = macos::MacosBackend;
+
 #[cfg(all(target_os = "macos", feature = "opengl"))]
 pub type GLSurface = macos::opengl::WindowSurface;
 

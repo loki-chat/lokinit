@@ -5,6 +5,9 @@ use crate::window::{ScreenMode, WindowBuilder, WindowHandle};
 use wayland::WaylandBackend;
 use x11::X11Backend;
 
+#[cfg(feature = "opengl")]
+use crate::gl::*;
+
 pub mod wayland;
 pub mod x11;
 
@@ -57,5 +60,25 @@ impl LokinitBackend for LinuxBackend {
             Self::X11(x11) => x11.set_screen_mode(handle, screen_mode),
             Self::Wayland(wl) => wl.set_screen_mode(handle, screen_mode),
         }
+    }
+
+    fn fetch_monitors(&mut self) -> Vec<crate::prelude::Monitor> {
+        todo!("fetch monitors")
+    }
+
+    #[cfg(feature = "opengl")]
+    fn create_window_surface(
+        &mut self,
+        window: WindowHandle,
+        cfg: crate::prelude::OpenGLConfig,
+    ) -> GLSurface {
+        todo!("create window surface")
+    }
+
+    fn load_opengl_func(
+        &mut self,
+        proc_name: *const std::ffi::c_char,
+    ) -> Option<*mut std::ffi::c_void> {
+        todo!("load opengl func")
     }
 }

@@ -21,6 +21,9 @@ use {
     },
 };
 
+#[cfg(feature = "opengl")]
+use crate::gl::*;
+
 pub mod display_handler;
 pub mod registry_handler;
 
@@ -74,16 +77,35 @@ impl LokinitBackend for WaylandBackend {
     fn create_window(&mut self, builder: WindowBuilder) -> Result<WindowHandle, CreateWindowError> {
         todo!("Create window")
     }
+
     fn close_window(&mut self, handle: WindowHandle) {
         todo!("Close window")
     }
+
     fn fetch_monitors(&mut self) -> Vec<Monitor> {
         todo!("Fetch monitors")
     }
+
     fn poll_event(&mut self) -> Option<Event> {
         todo!("Poll event")
     }
+
     fn set_screen_mode(&mut self, handle: WindowHandle, screen_mode: ScreenMode) {
         todo!("Set screen mode")
+    }
+
+    fn create_window_surface(
+        &mut self,
+        window: WindowHandle,
+        cfg: crate::prelude::OpenGLConfig,
+    ) -> GLSurface {
+        todo!("create window surface")
+    }
+
+    fn load_opengl_func(
+        &mut self,
+        proc_name: *const std::ffi::c_char,
+    ) -> Option<*mut std::ffi::c_void> {
+        todo!("load OpenGL function")
     }
 }
