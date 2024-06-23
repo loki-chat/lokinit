@@ -1,8 +1,8 @@
 //! Lokinit's OpenGL API.
 
-pub use crate::native::GLSurface;
+pub use crate::native::WindowSurface;
 use crate::{
-    lok::{self},
+    lok::{self, LokinitBackend},
     prelude::WindowHandle,
 };
 
@@ -12,7 +12,7 @@ pub trait OpenGlSurface {
 }
 
 impl WindowHandle {
-    pub fn create_surface(&self, cfg: OpenGlConfig) -> GLSurface {
+    pub fn create_surface(&self, cfg: OpenGLConfig) -> WindowSurface {
         lok::with(|backend| backend.create_window_surface(*self, cfg))
     }
 }

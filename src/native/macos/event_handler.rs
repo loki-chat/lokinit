@@ -5,7 +5,7 @@ use {
 
 impl MacosBackend {
     pub fn handle_raw_event(&mut self, raw_event: NSEvent) {
-        let event_window = WindowHandle(raw_event.window_number() as usize);
+        let event_window = WindowHandle(raw_event.window_number());
         match raw_event.event_type() {
             NSEventType::AppKitDefined => match raw_event.event_subtype() {
                 NSEventSubtype::WindowMoved => {
@@ -27,7 +27,7 @@ impl MacosBackend {
                     self.windows
                         .get_mut(self.frontmost_window.as_ref().unwrap())
                         .unwrap()
-                        .make_main();
+                        .focus();
                 }
                 NSEventSubtype::Undocumented(_) | NSEventSubtype::WindowExposed => {
                     self.nsapp.send_event(raw_event);
@@ -49,10 +49,16 @@ impl MacosBackend {
                 let NSPoint { x, y } = NSEvent::mouse_location();
 
                 if let Some(resize_border) = self.resize_direction {
-                    self.windows
-                        .get_mut(&event_window.0)
-                        .unwrap()
-                        .resize_border(resize_border, Point::Screen(x as i32, y as i32))
+                    let window = self.windows.get_mut(&event_window.0).unwrap();
+                    window.resize_border(resize_border, Point::Screen(x, y));
+                    let size = window.frame().size;
+
+                    self.event_queue.push_back(Event {
+                        // TODO: Time
+                        time: Duration::ZERO,
+                        window: event_window,
+                        kind: EventKind::Resized(size.width as _, size.height as _),
+                    })
                 }
 
                 self.event_queue.push_back(Event {
@@ -87,7 +93,7 @@ impl MacosBackend {
                 self.frontmost_window = Some(event_window.0);
 
                 self.resize_direction =
-                    window.point_in_border(Point::Window(mouse_loc.x as i32, mouse_loc.y as i32));
+                    window.point_in_border(Point::Window(mouse_loc.x, mouse_loc.y));
                 if self.resize_direction.is_none() {
                     self.nsapp.send_event(raw_event);
                 }

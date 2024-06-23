@@ -1,19 +1,22 @@
-use {
-    crate::{gl::OpenGLSurface, prelude::WindowHandle},
-    loki_mac::ffi::NSOpenGLContext,
+use crate::{
+    gl::OpenGLSurface,
+    lok::{self, LokinitBackend},
+    prelude::WindowHandle,
 };
 
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct WindowSurface {
-    pub(crate) context: NSOpenGLContext,
     pub(crate) window: WindowHandle,
 }
 impl OpenGLSurface for WindowSurface {
     fn make_active(&self) {
-        self.context.make_current();
+        lok::with(|backend| {
+            backend.make_surface_active(*self);
+        });
     }
     fn flush(&self) {
-        // TODO: Update only really needs to be called when the view is resized.
-        self.context.update();
-        self.context.flush_buffer();
+        lok::with(|backend| {
+            backend.flush_surface(*self);
+        });
     }
 }

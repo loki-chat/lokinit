@@ -9,31 +9,19 @@ use {
 };
 
 fn main() {
-    println!("Loading Lokinit");
     lok::init();
 
-    println!("Loading GL");
     gl::load_with(|func| {
-        println!("  Loading GL function {func}");
         let name = CString::new(func).unwrap();
 
-        let ptr = lok::load_opengl_func(name.as_ptr()).unwrap_or(ptr::null_mut());
-        if ptr.is_null() {
-            println!("      WARNING: Was null");
-        }
-
-        ptr
+        lok::load_opengl_func(name.as_ptr()).unwrap_or(ptr::null_mut())
     });
 
-    println!("Creating window");
     let window = lok::create_window(
         WindowBuilder::new()
-            .title("Hello")
-            .transparent(false)
+            .title("OpenGL")
             .centered(true)
-            .size(600, 400)
-            .position(200, 400)
-            .resizable(true),
+            .size(600, 400),
     )
     .unwrap();
     println!("Creating surface");
@@ -41,10 +29,29 @@ fn main() {
     println!("Making surface active");
     surface.make_active();
 
-    println!("Making drawer");
     let mut drawer = OpenglDrawer::new(600, 400, 1.0);
-    drawer.clear();
+    draw(&mut drawer, &surface);
+
+    while let Some(event) = lok::poll_event() {
+        match event.kind {
+            EventKind::Resized(x, y) => {
+                drawer.resize(
+                    glam::Vec2 {
+                        x: x as _,
+                        y: y as _,
+                    },
+                    1.0,
+                );
+                draw(&mut drawer, &surface);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn draw(drawer: &mut OpenglDrawer, surface: &WindowSurface) {
     drawer.begin_frame();
+    drawer.clear();
     drawer.draw_rect(&RectBlueprint {
         rect: Rect {
             x: 0.0,
@@ -61,6 +68,4 @@ fn main() {
     });
     drawer.end_frame();
     surface.flush();
-
-    while let Some(event) = lok::poll_event() {}
 }

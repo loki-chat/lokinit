@@ -7,6 +7,7 @@ use std::rc::Rc;
 use dl::{dlopen, dlsym, get_dlerror, RTLD_NOW};
 
 pub mod dl;
+pub mod hashnt;
 pub mod locale;
 
 #[cfg(feature = "wayland")]

@@ -1,5 +1,3 @@
-use crate::ffi;
-
 #[repr(usize)]
 #[allow(clippy::enum_clike_unportable_variant)]
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -68,24 +66,6 @@ impl NSWindowStyleMask {
     pub const fn hud_window(mut self) -> Self {
         self.0 |= 1 << 13;
         self
-    }
-}
-
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub enum NSRunLoopMode {
-    Default,
-    EventTracking,
-    ModalPanel,
-}
-impl From<NSRunLoopMode> for ffi::NSRunLoopMode {
-    fn from(val: NSRunLoopMode) -> Self {
-        unsafe {
-            match val {
-                NSRunLoopMode::Default => ffi::NSDefaultRunLoopMode,
-                NSRunLoopMode::EventTracking => ffi::NSEventTrackingRunLoopMode,
-                NSRunLoopMode::ModalPanel => ffi::NSModalPanelRunLoopMode,
-            }
-        }
     }
 }
 

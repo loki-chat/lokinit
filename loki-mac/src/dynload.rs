@@ -1,7 +1,7 @@
 //! Dynamic library loading for macOS.
 
 use std::{
-    ffi::{c_char, c_int, c_void, CString},
+    ffi::{c_char, c_int, c_void},
     mem,
     ptr::NonNull,
 };

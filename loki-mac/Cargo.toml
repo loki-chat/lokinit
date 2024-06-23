@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-objective-rust = "0.1"
+objective-rust = { workspace = true }

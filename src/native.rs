@@ -1,37 +1,36 @@
 #[cfg(target_os = "android")]
 pub mod android;
-
 #[cfg(target_os = "ios")]
 pub mod ios;
-
 #[cfg(target_os = "linux")]
 pub mod linux;
-
 #[cfg(target_os = "macos")]
 pub mod macos;
-
 #[cfg(target_os = "windows")]
 pub mod windows;
 
-// export common stuff
-
-#[cfg(target_os = "android")]
-pub use android;
-
-#[cfg(target_os = "ios")]
-pub use ios;
-
 #[cfg(target_os = "linux")]
-pub type DefaultLokinitBackend = linux::LinuxBackend;
+mod types {
+    use super::linux;
 
-#[cfg(all(target_os = "linux", feature = "opengl"))]
-pub type GLSurface = linux::opengl::GlxSurface;
+    pub type DefaultLokinitBackend = linux::LinuxBackend;
+    pub type WindowId = usize;
 
+    #[cfg(feature = "opengl")]
+    pub type WindowSurface = ();
+}
 #[cfg(target_os = "macos")]
-pub type DefaultLokinitBackend = macos::MacosBackend;
+mod types {
+    use super::macos;
 
-#[cfg(all(target_os = "macos", feature = "opengl"))]
-pub type GLSurface = macos::opengl::WindowSurface;
+    pub type DefaultLokinitBackend = macos::MacosBackend;
+    pub type WindowId = isize;
+
+    #[cfg(feature = "opengl")]
+    pub type WindowSurface = macos::opengl::WindowSurface;
+}
 
 #[cfg(target_os = "windows")]
 pub type DefaultLokinitBackend = windows::WindowsBackend;
+
+pub use types::*;

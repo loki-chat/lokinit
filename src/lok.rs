@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use crate::{native::DefaultLokinitBackend, window::ScreenMode};
 #[cfg(feature = "opengl")]
 use {
-    crate::gl::{GLSurface, OpenGlConfig},
+    crate::gl::{OpenGLConfig, WindowSurface},
     std::ffi::{c_char, c_void},
 };
 
@@ -48,42 +48,34 @@ pub trait LokinitBackend {
     fn fetch_monitors(&mut self) -> Vec<Monitor>;
 
     #[cfg(feature = "opengl")]
-    fn create_window_surface(&mut self, window: WindowHandle, cfg: OpenGlConfig) -> GLSurface;
-
+    fn create_window_surface(&mut self, window: WindowHandle, cfg: OpenGLConfig) -> WindowSurface;
     #[cfg(feature = "opengl")]
     fn load_opengl_func(&mut self, proc_name: *const c_char) -> Option<*mut c_void>;
+    #[cfg(feature = "opengl")]
+    fn make_surface_active(&self, surface: WindowSurface);
+    #[cfg(feature = "opengl")]
+    fn flush_surface(&self, surface: WindowSurface);
+    #[cfg(feature = "opengl")]
+    fn update_surface(&self, surface: WindowSurface);
 }
 
 thread_local! {
-    pub static INSTANCE: RefCell<Option<Box<dyn LokinitBackend>>> = RefCell::new(None);
+    static INSTANCE: RefCell<Option<DefaultLokinitBackend>> = RefCell::new(None);
 }
-
-static INITIALIZED: AtomicBool = AtomicBool::new(false);
 
 /// Initializes Lokinit with a default backend.
 pub fn init() {
-    init_backend::<DefaultLokinitBackend>()
-}
-
-pub fn init_backend<B: LokinitBackend + 'static>() {
     INSTANCE.with(|instance| {
         let mut instance = instance.borrow_mut();
-        let instance = instance.get_or_insert_with(|| {
-            if INITIALIZED.load(Ordering::Relaxed) {
-                panic!("Lokinit core has already been initialized");
-            }
 
-            let backend = B::init();
-            INITIALIZED.store(true, Ordering::Release);
-            Box::new(backend)
-        });
+        *instance = Some(DefaultLokinitBackend::init());
     })
 }
 
-pub fn with<R>(callback: impl FnOnce(&mut dyn LokinitBackend) -> R) -> R {
+pub fn with<R>(callback: impl FnOnce(&mut DefaultLokinitBackend) -> R) -> R {
     INSTANCE.with(|instance| {
         let mut instance = instance.borrow_mut();
-        let instance = instance.as_deref_mut().expect("Lokinit is not initialized");
+        let instance = instance.as_mut().expect("Lokinit is not initialized");
         (callback)(instance)
     })
 }
@@ -96,18 +88,8 @@ pub fn close_window(handle: WindowHandle) {
     with(|instance| instance.close_window(handle))
 }
 
-pub fn drag_move_window(handle: WindowHandle) {
-    unimplemented!()
-}
-
-pub fn drag_resize_window(handle: WindowHandle) {
-    unimplemented!()
-}
-
-pub fn focus_window(handle: WindowHandle) {
-    unimplemented!()
-}
-
+/// Blocks the thread until it receives a new event from the OS' display server, then processes and
+/// returns that event. This will return `None` when there are no more events to be processed.
 pub fn poll_event() -> Option<Event> {
     with(|instance| instance.poll_event())
 }
@@ -121,7 +103,7 @@ pub fn fetch_monitors() -> Vec<Monitor> {
 }
 
 #[cfg(feature = "opengl")]
-fn create_window_surface(window: WindowHandle, cfg: OpenGlConfig) -> GLSurface {
+fn create_window_surface(window: WindowHandle, cfg: OpenGLConfig) -> WindowSurface {
     with(|instance| instance.create_window_surface(window, cfg))
 }
 #[cfg(feature = "opengl")]

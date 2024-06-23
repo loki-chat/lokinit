@@ -1,263 +1,304 @@
 //! An implementation of Wayland's wire protocol.
 //! Implemented from https://wayland.freedesktop.org/docs/html/ch04.html#sect-Protocol-Wire-Format.
 
-use std::{ffi::CStr, io::Write, mem, os::unix::net::UnixStream};
+use std::{cell::Cell, ffi::CStr, fmt::Display, os::fd::RawFd};
 
-use super::Object;
+use super::{interfaces::Interface, Object};
 
-pub trait WireType {
-    fn to_wire(&self, vec: &mut Vec<u8>);
-    fn from_wire(data: &[u32]) -> (Self, usize)
-    where
-        Self: Sized;
-    fn size(&self) -> u16;
+/// Types that can be serialized as wire.
+pub trait WriteWire {
+    fn write_wire(&self, encoder: &mut WireEncoder);
 }
-/// The `uint` type.
-impl WireType for u32 {
-    fn to_wire(&self, vec: &mut Vec<u8>) {
-        vec.extend(self.to_ne_bytes());
+/// Types that can deserialize from wire.
+pub trait ReadWire<'a>: Sized {
+    fn read_wire(data: &'a [u8]) -> (Self, usize);
+}
+
+/// Decodes a Wire message.
+pub struct WireDecoder<'a> {
+    bytes: &'a [u8],
+    idx: Cell<usize>,
+}
+impl<'a> WireDecoder<'a> {
+    pub fn new(vec: &'a [u8]) -> Self {
+        Self {
+            bytes: vec,
+            idx: Cell::new(8),
+        }
     }
-    fn from_wire(data: &[u32]) -> (Self, usize) {
-        (data[0], 1)
+
+    pub fn object_id(&self) -> Id {
+        Id {
+            raw: u32::from_ne_bytes([self.bytes[0], self.bytes[1], self.bytes[2], self.bytes[3]]),
+        }
     }
-    fn size(&self) -> u16 {
-        4
+    pub fn opcode(&self) -> u16 {
+        u16::from_ne_bytes([self.bytes[4], self.bytes[5]])
+    }
+    pub fn len(&self) -> u16 {
+        u16::from_ne_bytes([self.bytes[6], self.bytes[7]])
+    }
+    pub fn is_empty(&self) -> bool {
+        // Message header is 8 bytes, so it's the min message size
+        self.len() == 8
+    }
+    pub fn decode<T: ReadWire<'a>>(&self) -> T {
+        let (result, used_u8s) = T::read_wire(&self.bytes[self.idx.get()..]);
+        self.idx.set(self.idx.get() + used_u8s);
+
+        result
     }
 }
-/// The `int` type.
-impl WireType for i32 {
-    fn to_wire(&self, vec: &mut Vec<u8>) {
-        vec.extend(self.to_ne_bytes());
-    }
-    fn from_wire(data: &[u32]) -> (Self, usize) {
-        (unsafe { mem::transmute(data[0]) }, 1)
-    }
-    fn size(&self) -> u16 {
-        4
-    }
+
+/// Encodes a wire message.
+pub struct WireEncoder {
+    pub vec: Vec<u8>,
+    pub fd: Option<RawFd>,
 }
-/// The `fixed` type.
-impl WireType for f32 {
-    fn to_wire(&self, vec: &mut Vec<u8>) {
-        vec.extend(self.to_ne_bytes());
-    }
-    fn from_wire(data: &[u32]) -> (Self, usize) {
-        (f32::from_bits(data[0]), 1)
-    }
-    fn size(&self) -> u16 {
-        4
-    }
-}
-/// The `string` type.
-impl WireType for &str {
-    fn to_wire(&self, vec: &mut Vec<u8>) {
-        let len = (self.len() + 1) as u32;
-        len.to_wire(vec);
-        vec.extend_from_slice(self.as_bytes());
+impl WireEncoder {
+    pub fn new(obj: Id, opcode: u16) -> Self {
+        let mut vec = Vec::with_capacity(8);
+
+        // First 4 bytes: Object ID
+        vec.extend(obj.raw.to_ne_bytes());
+        // Next 2 bytes: Opcode
+        vec.extend(opcode.to_ne_bytes());
+        // Next 2 bytes: Message len (set in .finish())
+        vec.push(0);
         vec.push(0);
 
-        // Must align to 32-bits
-        if len % 4 != 0 {
-            let alignment_padding_size = 4 - (len % 4);
-            vec.resize(vec.len() + alignment_padding_size as usize, 0);
-        }
+        Self { vec, fd: None }
     }
-    fn from_wire(data: &[u32]) -> (Self, usize) {
-        let len = data[0].div_ceil(4) + 1;
-        let c_str = unsafe { CStr::from_ptr(&data[1..] as *const [u32] as *const _) };
-        (
-            c_str.to_str().expect("Error: Wayland string was not UTF-8"),
-            len as usize,
-        )
-    }
-    fn size(&self) -> u16 {
-        4 + self.len() as u16 + 1
-    }
-}
-/// The nullable `string` type.
-impl WireType for Option<&str> {
-    fn to_wire(&self, vec: &mut Vec<u8>) {
-        match self {
-            Some(string) => string.to_wire(vec),
-            None => vec.push(0),
-        }
-    }
-    fn from_wire(data: &[u32]) -> (Self, usize) {
-        let len = data[0];
+    pub fn finish(mut self) -> (Vec<u8>, Option<RawFd>) {
+        let len = (self.vec.len() as u16).to_ne_bytes();
+        println!("Final wire msg len: {}", self.vec.len());
+        self.vec[6] = len[0];
+        self.vec[7] = len[1];
 
-        if len == 0 {
-            (None, 1)
-        } else {
-            let data = <&str>::from_wire(data);
-            (Some(data.0), data.1)
-        }
-    }
-    fn size(&self) -> u16 {
-        match self {
-            Some(string) => string.size(),
-            None => 4,
-        }
+        (self.vec, self.fd)
     }
 }
-/// The `object` type.
-impl<O: Object> WireType for O {
-    fn to_wire(&self, vec: &mut Vec<u8>) {
-        self.id().to_wire(vec);
-    }
-    fn from_wire(data: &[u32]) -> (Self, usize) {
-        unreachable!("Decoding objects from wire")
-    }
-    fn size(&self) -> u16 {
-        4
-    }
-}
-/// The nullable `object` type.
-impl<I: Object> WireType for Option<I> {
-    fn to_wire(&self, vec: &mut Vec<u8>) {
-        match self {
-            Some(object) => object.to_wire(vec),
-            None => vec.push(0),
-        }
-    }
-    fn from_wire(data: &[u32]) -> (Self, usize) {
-        unreachable!("Decoding objects from wire")
-    }
-    fn size(&self) -> u16 {
-        4
-    }
-}
-/// The `array` type.
-// impl<T: WireType> WireType for &[T] {
-//     fn write_wire(&self, socket: &mut UnixStream) {
-//         let size = self.iter().map(|val| val.size()).sum::<u16>() as u32;
-//         socket.write_all(size.to_ne_bytes().as_ref()).unwrap();
-//         self.iter().for_each(|val| val.write_wire(socket));
-//         // Must align to 32-bits
-//         for _ in 0..size % 4 {
-//             socket.write_all(&[0]).unwrap();
-//         }
-//     }
-//     fn from_wire(data: &[u32]) -> (Self, usize) {
-//         todo!()
-//     }
-//     fn size(&self) -> u16 {
-//         self.iter().map(|val| val.size()).sum::<u16>() + 32
-//     }
-// }
 
-/// Wire's `new_id` type.
-pub struct NewId<'a, O: Object>(pub &'a O);
-impl<'a, O: Object> WireType for NewId<'a, O> {
-    fn to_wire(&self, vec: &mut Vec<u8>) {
-        self.0.interface().to_wire(vec);
-        self.0.version().to_wire(vec);
-        self.0.to_wire(vec);
+// int
+
+impl<'a> ReadWire<'a> for i32 {
+    fn read_wire(data: &'a [u8]) -> (Self, usize) {
+        (Self::from_ne_bytes([data[0], data[1], data[2], data[3]]), 4)
     }
-    fn from_wire(data: &[u32]) -> (Self, usize)
-    where
-        Self: Sized,
-    {
+}
+impl WriteWire for i32 {
+    fn write_wire(&self, encoder: &mut WireEncoder) {
+        encoder.vec.extend(self.to_ne_bytes());
+    }
+}
+
+// uint
+
+impl ReadWire<'_> for u32 {
+    fn read_wire(data: &'_ [u8]) -> (Self, usize) {
+        (Self::from_ne_bytes([data[0], data[1], data[2], data[3]]), 4)
+    }
+}
+impl WriteWire for u32 {
+    fn write_wire(&self, encoder: &mut WireEncoder) {
+        encoder.vec.extend(self.to_ne_bytes())
+    }
+}
+
+// fixed
+
+// TODO: implement fixed decimal point functionalities
+#[derive(Clone, Copy)]
+#[allow(dead_code)]
+pub struct Fixed(i32);
+
+impl<'a> ReadWire<'a> for Fixed {
+    fn read_wire(_data: &'a [u8]) -> (Self, usize) {
         todo!()
     }
-    fn size(&self) -> u16 {
-        self.0.interface().size() + self.0.version().size() + self.0.id().size()
+}
+impl WriteWire for Fixed {
+    fn write_wire(&self, _encoder: &mut WireEncoder) {
+        todo!()
     }
 }
 
-/// The header for the wire format.
-#[derive(Debug)]
-pub struct MessageHeader {
-    pub object: u32,
-    pub opcode: u16,
-    pub message_size: u16,
-}
-impl MessageHeader {
-    pub fn to_bytes(self) -> [u8; 8] {
-        self.into()
+// string
+
+impl<'a> ReadWire<'a> for &'a str {
+    fn read_wire(data: &'a [u8]) -> (Self, usize) {
+        let len = u32::from_ne_bytes([data[0], data[1], data[2], data[3]]);
+
+        if len == 0 {
+            return ("", 4);
+        }
+
+        let c_str = unsafe { CStr::from_ptr(&data[4..] as *const [u8] as *const _) };
+        (
+            c_str
+                .to_str()
+                .expect("Lokinit error: Wayland string was not UTF-8"),
+            (len + 4) as usize,
+        )
     }
 }
-impl From<[u8; 8]> for MessageHeader {
-    fn from(value: [u8; 8]) -> Self {
-        Self {
-            object: u32::from_ne_bytes([value[0], value[1], value[2], value[3]]),
-            opcode: u16::from_ne_bytes([value[4], value[5]]),
-            message_size: u16::from_ne_bytes([value[6], value[7]]),
+impl<'a> WriteWire for &'a str {
+    fn write_wire(&self, encoder: &mut WireEncoder) {
+        let len = (self.len() + 1) as u32;
+        len.write_wire(encoder);
+
+        let mut bytes = self.as_bytes().iter().cloned().peekable();
+        while bytes.peek().is_some() {
+            encoder.vec.extend([
+                bytes.next().unwrap_or(0),
+                bytes.next().unwrap_or(0),
+                bytes.next().unwrap_or(0),
+                bytes.next().unwrap_or(0),
+            ])
+        }
+        if self.len() % 4 == 0 {
+            encoder.vec.extend(0u32.to_ne_bytes());
         }
     }
 }
-impl From<MessageHeader> for [u8; 8] {
-    fn from(value: MessageHeader) -> Self {
-        let object = value.object.to_ne_bytes();
-        let opcode = value.opcode.to_ne_bytes();
-        let message_size = value.message_size.to_ne_bytes();
+impl ReadWire<'_> for String {
+    fn read_wire(data: &'_ [u8]) -> (Self, usize) {
+        let (str, used_bytes) = <&str>::read_wire(data);
 
-        [
-            object[0],
-            object[1],
-            object[2],
-            object[3],
-            opcode[0],
-            opcode[1],
-            message_size[0],
-            message_size[1],
-        ]
+        (str.to_string(), used_bytes)
+    }
+}
+impl WriteWire for String {
+    fn write_wire(&self, encoder: &mut WireEncoder) {
+        self.as_str().write_wire(encoder)
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::wayland::{wire::NewId, Object};
+// object
 
-    use super::WireType;
-
-    fn to_wire<W: WireType>(w: W) -> Vec<u8> {
-        let mut vec = Vec::new();
-        w.to_wire(&mut vec);
-        vec
+impl<O: Object> WriteWire for O {
+    fn write_wire(&self, encoder: &mut WireEncoder) {
+        self.id().write_wire(encoder);
     }
+}
+impl<O: Object> ReadWire<'_> for O {
+    fn read_wire(data: &[u8]) -> (Self, usize) {
+        let (id, bytes) = u32::read_wire(data);
 
-    #[test]
-    fn nums() {
-        assert_eq!(to_wire(0_u32), 0_u32.to_ne_bytes());
-        assert_eq!(to_wire(15_u32), 15_u32.to_ne_bytes());
+        (Self::new_with_id(Id { raw: id }), bytes)
     }
-
-    #[test]
-    fn string() {
-        let val = "stringy string";
-
-        let len = val.len() + 1;
-        let mut expected = (len as u32).to_ne_bytes().to_vec();
-        expected.extend(b"stringy string\0");
-        expected.push(0);
-
-        assert!(expected.len() % 4 == 0);
-        assert_eq!(to_wire(val), expected);
-    }
-
-    #[test]
-    fn new_id() {
-        let object = &VeryRealObject {};
-
-        let mut expected = to_wire("wl_object");
-        expected.extend(1_u32.to_ne_bytes());
-        expected.extend(1_u32.to_ne_bytes());
-
-        println!("{expected:?}");
-        assert_eq!(to_wire(NewId(object)), expected);
-    }
-
-    struct VeryRealObject {}
-    impl Object for VeryRealObject {
-        fn id(&self) -> u32 {
-            1
+}
+impl<O: Object> WriteWire for Option<O> {
+    fn write_wire(&self, encoder: &mut WireEncoder) {
+        match self {
+            Some(obj) => obj.write_wire(encoder),
+            None => 0_u32.write_wire(encoder),
         }
+    }
+}
+impl WriteWire for Option<Id> {
+    fn write_wire(&self, encoder: &mut WireEncoder) {
+        self.unwrap_or(Id { raw: 0 }).write_wire(encoder);
+    }
+}
 
-        fn interface(&self) -> &'static str {
-            "wl_object"
-        }
-        fn version(&self) -> u32 {
-            1
-        }
+/// A file descriptor.
+#[derive(PartialEq, Eq, Clone, Copy)]
+#[repr(transparent)]
+pub struct Fd {
+    pub raw: RawFd,
+}
+impl From<RawFd> for Fd {
+    fn from(value: RawFd) -> Self {
+        Self { raw: value }
+    }
+}
+impl From<Fd> for RawFd {
+    fn from(value: Fd) -> Self {
+        value.raw
+    }
+}
+impl WriteWire for Fd {
+    fn write_wire(&self, encoder: &mut WireEncoder) {
+        encoder.fd = Some(self.raw);
+    }
+}
+
+/// A 32-bit unique identifier for a global singleton.
+#[derive(Hash, PartialEq, Eq, Clone, Copy)]
+#[repr(transparent)]
+pub struct Name {
+    pub raw: u32,
+}
+impl From<u32> for Name {
+    fn from(value: u32) -> Self {
+        Self { raw: value }
+    }
+}
+impl From<Name> for u32 {
+    fn from(value: Name) -> Self {
+        value.raw
+    }
+}
+impl WriteWire for Name {
+    fn write_wire(&self, encoder: &mut WireEncoder) {
+        self.raw.write_wire(encoder);
+    }
+}
+impl ReadWire<'_> for Name {
+    fn read_wire(data: &[u8]) -> (Self, usize) {
+        let (raw, len) = u32::read_wire(data);
+        (Self { raw }, len)
+    }
+}
+impl Display for Name {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.raw)
+    }
+}
+
+/// A 32-bit unique identifier for an object.
+#[derive(Hash, PartialEq, Eq, Clone, Copy)]
+#[repr(transparent)]
+pub struct Id {
+    pub raw: u32,
+}
+impl From<u32> for Id {
+    fn from(value: u32) -> Self {
+        Self { raw: value }
+    }
+}
+impl From<Id> for u32 {
+    fn from(value: Id) -> Self {
+        value.raw
+    }
+}
+impl WriteWire for Id {
+    fn write_wire(&self, encoder: &mut WireEncoder) {
+        self.raw.write_wire(encoder);
+    }
+}
+impl ReadWire<'_> for Id {
+    fn read_wire(data: &[u8]) -> (Self, usize) {
+        let (name, len) = u32::read_wire(data);
+        (Self { raw: name }, len)
+    }
+}
+impl Display for Id {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.raw)
+    }
+}
+
+pub struct NewId {
+    pub interface: Interface,
+    pub version: u32,
+    pub id: Id,
+}
+impl WriteWire for NewId {
+    fn write_wire(&self, encoder: &mut WireEncoder) {
+        self.interface.to_string().write_wire(encoder);
+        self.version.write_wire(encoder);
+        self.id.write_wire(encoder);
     }
 }

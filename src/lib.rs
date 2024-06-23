@@ -3,17 +3,17 @@ pub mod event;
 pub mod gl;
 pub mod keycode;
 pub mod lok;
-mod native;
+pub mod native;
 pub mod window;
 
 pub mod prelude {
-    pub use crate::event::{
-        Event, EventKind, KeyboardEvent, MouseButton, MouseEvent, TouchEvent, TouchPhase,
-    };
     #[cfg(feature = "opengl")]
-    pub use crate::gl::{OpenGlConfig, OpenGlSurface};
-    pub use crate::keycode::KeyCode;
-    pub use crate::lok::{self, Monitor, MonitorId};
-    pub use crate::native::DefaultLokinitBackend;
-    pub use crate::window::{WindowBuilder, WindowHandle, WindowPos, WindowSize};
+    pub use crate::gl::{OpenGLConfig, OpenGLSurface, WindowSurface};
+    pub use crate::{
+        event::{Event, EventKind, KeyboardEvent, MouseButton, MouseEvent, TouchEvent, TouchPhase},
+        keycode::KeyCode,
+        lok::{self, Monitor, MonitorId},
+        native::DefaultLokinitBackend,
+        window::{WindowBorder, WindowBuilder, WindowHandle, WindowPos, WindowSize},
+    };
 }

@@ -1,16 +1,21 @@
+#[cfg(feature = "opengl")]
+use loki_mac::NSOpenGLContext;
 use {
     crate::window::WindowBorder,
     core::ops::{Deref, DerefMut},
     loki_mac::{NSPoint, NSRect, NSSize, NSWindow},
+    objective_rust::prelude::*,
 };
 
 /// A wrapper around [`NSWindow`] with resize features.
 pub struct Window {
-    pub nswindow: NSWindow,
+    pub nswindow: ObjcRc<NSWindow>,
     pub borders: [NSRect; 8],
+    #[cfg(feature = "opengl")]
+    pub gl_context: Option<ObjcRc<NSOpenGLContext>>,
 }
 impl Window {
-    pub fn new(nswindow: NSWindow) -> Self {
+    pub fn new(nswindow: ObjcRc<NSWindow>) -> Self {
         let mut this = Self {
             nswindow,
             borders: [
@@ -23,26 +28,28 @@ impl Window {
                 NSRect::default(),
                 NSRect::default(),
             ],
+            #[cfg(feature = "opengl")]
+            gl_context: None,
         };
         this.recalculate_borders();
 
         this
     }
 
-    pub fn point_to_window_coordinates(&self, point: Point) -> (i32, i32) {
+    pub fn point_to_window_coordinates(&self, point: Point) -> (f64, f64) {
         match point {
             Point::Window(x, y) => (x, y),
             Point::Screen(x, y) => {
                 let origin = self.frame().origin;
-                (x - origin.x as i32, y - origin.y as i32)
+                (x - origin.x, y - origin.y)
             }
         }
     }
-    pub fn point_to_screen_coordinates(&self, point: Point) -> (i32, i32) {
+    pub fn point_to_screen_coordinates(&self, point: Point) -> (f64, f64) {
         match point {
             Point::Window(x, y) => {
                 let origin = self.frame().origin;
-                (x + origin.x as i32, y + origin.y as i32)
+                (x + origin.x, y + origin.y)
             }
             Point::Screen(x, y) => (x, y),
         }
@@ -51,8 +58,6 @@ impl Window {
     /// Resize a border of this window to a point on the screen.
     pub fn resize_border(&mut self, border: WindowBorder, point: Point) {
         let (mouse_x, mouse_y) = self.point_to_window_coordinates(point);
-        let mouse_x = mouse_x as f64;
-        let mouse_y = mouse_y as f64;
         let frame = self.frame();
 
         let mut new_frame = frame.clone();
@@ -247,6 +252,6 @@ impl From<usize> for WindowBorder {
 }
 
 pub enum Point {
-    Window(i32, i32),
-    Screen(i32, i32),
+    Window(f64, f64),
+    Screen(f64, f64),
 }

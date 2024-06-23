@@ -23,7 +23,7 @@ impl LokinitBackend for LinuxBackend {
     fn init() -> Self {
         match std::env::var("LOKINIT_BACKEND") {
             Ok(x) if x == "wayland" => Self::Wayland(WaylandBackend::init()),
-            Ok(x) if x == "xlib" => Self::X11(X11Backend::init().unwrap()),
+            Ok(x) if x == "x11" => Self::X11(X11Backend::init().unwrap()),
 
             _ => match WaylandBackend::new() {
                 Some(x) => Self::Wayland(x),
@@ -88,3 +88,5 @@ impl LokinitBackend for LinuxBackend {
         todo!("load opengl func")
     }
 }
+
+type WindowSurface = ();
