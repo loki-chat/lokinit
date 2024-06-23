@@ -1,4 +1,4 @@
-use loki_mac::*;
+use loki_mac::prelude::*;
 
 fn main() {
     let mut nsapp = NSApplication::shared();

@@ -18,7 +18,7 @@ use {
         prelude::Monitor,
         window::{WindowBorder, WindowBuilder, WindowHandle},
     },
-    loki_mac::*,
+    loki_mac::prelude::*,
     std::{
         collections::{HashMap, HashSet, VecDeque},
         time::Duration,

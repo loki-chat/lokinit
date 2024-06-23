@@ -1,10 +1,7 @@
-#[cfg(feature = "opengl")]
-use loki_mac::NSOpenGLContext;
 use {
     crate::window::WindowBorder,
     core::ops::{Deref, DerefMut},
-    loki_mac::{NSPoint, NSRect, NSSize, NSWindow},
-    objective_rust::prelude::*,
+    loki_mac::prelude::*,
 };
 
 /// A wrapper around [`NSWindow`] with resize features.

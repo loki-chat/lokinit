@@ -13,7 +13,6 @@ loki-linux = { path = "./loki-linux" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 loki-mac = { path = "./loki-mac" }
-objective-rust = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.9", features = [
@@ -36,7 +35,3 @@ opengl = []
 
 [workspace]
 members = ["loki-linux", "loki-mac"]
-
-[workspace.dependencies]
-objective-rust.path = "../../objective-rust"
-# objective-rust = "0.1"

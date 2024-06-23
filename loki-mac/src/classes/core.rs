@@ -94,7 +94,7 @@ mod ffi {
         /// The returned string must not be borrowed for longer than this NSString exists - in other
         /// words, `'a` must not outlive this string.
         pub unsafe fn as_str<'a>(&self) -> &'a str {
-            let c_string: *const u8 = self.to_c_string(crate::NSStringEncoding::UTF8).cast();
+            let c_string: *const u8 = self.to_c_string(NSStringEncoding::UTF8).cast();
             let len = self.len();
             let buffer = std::slice::from_raw_parts(c_string, len);
 

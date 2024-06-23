@@ -3,7 +3,12 @@ pub mod dynload;
 pub mod enums;
 pub mod wrappers;
 
-pub use {classes::all::*, enums::*};
+pub mod prelude {
+    pub use {
+        crate::{classes::all::*, enums::*},
+        objective_rust::prelude::*,
+    };
+}
 
 mod _link {
     use crate::classes::core::NSRunLoopMode;
