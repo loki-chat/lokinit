@@ -2,7 +2,7 @@
 
 #![allow(non_snake_case, clippy::upper_case_acronyms)]
 
-use std::ffi::{c_char, c_int, c_uint, c_ulong};
+use std::ffi::{c_char, c_int, c_uint, c_ulong, c_void};
 
 use crate::library;
 use crate::x11::{Bool, Font, Pixmap, XDisplay, XVisualInfo, XWindow, XID};
@@ -126,7 +126,7 @@ library! {
     pub fn glXChooseVisual(display: *mut XDisplay, screen: c_int, attrib_list: *mut c_int) -> *mut XVisualInfo;
     pub fn glXCreateContext(display: *mut XDisplay, vis: *mut XVisualInfo, share_list: GLXContext, direct: Bool) -> *mut XVisualInfo;
 	pub fn glXDestroyContext(display: *mut XDisplay, ctx: GLXContext);
-	pub fn glXMakeCurrent(display: *mut XDisplay, drawable: GLXDrawable) -> Bool;
+	pub fn glXMakeCurrent(display: *mut XDisplay, drawable: GLXDrawable, ctx: GLXContext) -> Bool;
 	pub fn glXCopyContext(display: *mut XDisplay, src: GLXContext, dst: GLXContext, mask: c_ulong);
 	pub fn glXSwapBuffers(display: *mut XDisplay, drawable: GLXDrawable);
 	pub fn glXCreateGLXPixmap(display: *mut XDisplay, visual: *mut XVisualInfo, pixmap: Pixmap) -> GLXPixmap;
@@ -170,4 +170,8 @@ library! {
 	pub fn glXQueryContext(display: *mut XDisplay, ctx: GLXContext, attribute: c_int, value: *mut c_int) -> c_int;
 	pub fn glXSelectEvent(display: *mut XDisplay, drawable: GLXDrawable, mask: c_ulong);
 	pub fn glXGetSelectedEvent(display: *mut XDisplay, drawable: GLXDrawable, mask: *mut c_ulong);
+
+	// GLX 1.4 and later
+
+	pub fn glXGetProcAddress(proc_name: *const u8) -> *mut c_void;
 }

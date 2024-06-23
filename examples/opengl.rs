@@ -5,7 +5,7 @@ use {
         OpenglDrawer,
     },
     lokinit::prelude::*,
-    std::{ffi::CString, ptr},
+    std::ffi::CString,
 };
 
 fn main() {
@@ -13,8 +13,7 @@ fn main() {
 
     gl::load_with(|func| {
         let name = CString::new(func).unwrap();
-
-        lok::load_opengl_func(name.as_ptr()).unwrap_or(ptr::null_mut())
+        lok::load_opengl_func(name.as_ptr())
     });
 
     let window = lok::create_window(
@@ -27,10 +26,10 @@ fn main() {
     println!("Creating surface");
     let surface = window.create_surface(OpenGlConfig::default());
     println!("Making surface active");
-    surface.make_active();
+    window.make_surface_active(surface);
 
     let mut drawer = OpenglDrawer::new(600, 400, 1.0);
-    draw(&mut drawer, &surface);
+    draw(&mut drawer, window, surface);
 
     while let Some(event) = lok::poll_event() {
         match event.kind {
@@ -42,14 +41,14 @@ fn main() {
                     },
                     1.0,
                 );
-                draw(&mut drawer, &surface);
+                draw(&mut drawer, window, surface);
             }
             _ => {}
         }
     }
 }
 
-fn draw(drawer: &mut OpenglDrawer, surface: &WindowSurface) {
+fn draw(drawer: &mut OpenglDrawer, window: WindowHandle, surface: WindowSurface) {
     drawer.begin_frame();
     drawer.clear();
     drawer.draw_rect(&RectBlueprint {
@@ -67,5 +66,5 @@ fn draw(drawer: &mut OpenglDrawer, surface: &WindowSurface) {
         alpha: 1.,
     });
     drawer.end_frame();
-    surface.flush();
+    window.flush_surface(surface);
 }

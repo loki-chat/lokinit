@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use crate::event::{Event, EventKind, KeyboardEvent, MouseButton, MouseEvent};
 use crate::keycode::KeyCode;
-use crate::lok::CreateWindowError;
+use crate::lok::{CreateWindowError, LokinitBackend};
 use crate::prelude::{WindowBuilder, WindowHandle, WindowPos, WindowSize};
 use crate::window::ScreenMode;
 
@@ -133,10 +133,26 @@ impl X11Backend {
         self.n_windows
     }
 
-    pub fn create_window(
-        &mut self,
-        builder: WindowBuilder,
-    ) -> Result<WindowHandle, CreateWindowError> {
+    #[cfg(feature = "opengl")]
+    pub fn window_pos(&self, window: WindowHandle) -> WindowPos {
+        self.get_window(window).position
+    }
+
+    #[cfg(feature = "opengl")]
+    pub fn window_size(&self, window: WindowHandle) -> WindowSize {
+        self.get_window(window).size
+    }
+}
+
+impl LokinitBackend for X11Backend {
+    fn init() -> Self
+    where
+        Self: Sized + 'static,
+    {
+        todo!()
+    }
+
+    fn create_window(&mut self, builder: WindowBuilder) -> Result<WindowHandle, CreateWindowError> {
         unsafe {
             let mut attributes = XSetWindowAttributes {
                 event_mask: xevent_mask::EXPOSURE
@@ -219,13 +235,13 @@ impl X11Backend {
         }
     }
 
-    pub fn close_window(&mut self, handle: WindowHandle) {
+    fn close_window(&mut self, handle: WindowHandle) {
         let window = self.windows.remove(&handle).unwrap();
         unsafe { (self.x11.XUnmapWindow)(self.display.as_ptr(), window.window) };
         self.n_windows -= 1;
     }
 
-    pub fn poll_event(&mut self) -> Option<Event> {
+    fn poll_event(&mut self) -> Option<Event> {
         if self.n_windows == 0 {
             // No events to poll if there are no windows
             return None;
@@ -264,7 +280,7 @@ impl X11Backend {
         }
     }
 
-    pub fn set_screen_mode(&mut self, window: WindowHandle, screen_mode: ScreenMode) {
+    fn set_screen_mode(&mut self, window: WindowHandle, screen_mode: ScreenMode) {
         // TODO: what really is the difference between borderless and fullscreen on X11?
         // What about bypassing the compositor as well?
 
@@ -293,12 +309,16 @@ impl X11Backend {
         }
     }
 
+    fn fetch_monitors(&mut self) -> Vec<crate::prelude::Monitor> {
+        todo!()
+    }
+
     #[cfg(feature = "opengl")]
-    pub fn create_window_surface(
-        &self,
+    fn create_window_surface(
+        &mut self,
         window: WindowHandle,
         config: OpenGlConfig,
-    ) -> super::GLSurface {
+    ) -> super::WindowSurface {
         use std::ptr;
 
         use loki_linux::glx::{
@@ -306,7 +326,7 @@ impl X11Backend {
         };
         use loki_linux::x11;
 
-        use crate::native::linux::opengl::GlxSurface;
+        use crate::native::linux::opengl::GlSurface;
 
         let glx_attribs = [
             glx::GLX_X_RENDERABLE,
@@ -387,16 +407,36 @@ impl X11Backend {
                 println!("glx context is indirect");
             }
 
-            GlxSurface(context)
+            GlSurface(context)
         }
     }
 
-    pub fn window_pos(&self, window: WindowHandle) -> WindowPos {
-        self.get_window(window).position
+    #[cfg(feature = "opengl")]
+    fn make_surface_active(&self, window: WindowHandle, surface: super::WindowSurface) {
+        unsafe {
+            (self.glx.glXMakeCurrent)(
+                self.display.as_ptr(),
+                XID::from_raw(window.0 as u64),
+                surface.0,
+            );
+        }
     }
 
-    pub fn window_size(&self, window: WindowHandle) -> WindowSize {
-        self.get_window(window).size
+    #[cfg(feature = "opengl")]
+    fn flush_surface(&self, window: WindowHandle, _surface: super::WindowSurface) {
+        unsafe {
+            (self.glx.glXSwapBuffers)(self.display.as_ptr(), XID::from_raw(window.0 as u64));
+        }
+    }
+
+    #[cfg(feature = "opengl")]
+    fn update_surface(&self, surface: super::WindowSurface) {
+        todo!()
+    }
+
+    #[cfg(feature = "opengl")]
+    fn load_opengl_func(&mut self, proc_name: *const std::ffi::c_char) -> *mut c_void {
+        unsafe { (self.glx.glXGetProcAddress)(proc_name as *const _) }
     }
 }
 

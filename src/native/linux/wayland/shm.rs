@@ -87,58 +87,60 @@ impl ShmAllocator {
         })
     }
 
-    pub fn allocate(&mut self, client: &WaylandClient, size: u64) -> Buffer {}
+    pub fn allocate(&mut self, client: &WaylandClient, size: u64) -> Buffer {
+        todo!()
+    }
 
     pub fn free(&mut self, client: &WaylandClient, buffer: Buffer) {
         let Buffer { wl_buffer, range } = buffer;
         client.call_method(&wl_buffer, WlBufferMethod::Destroy);
 
         let mut idx = self.free_list.len().div_ceil(2);
-        loop {
-            let current = self.free_list.get_mut(idx).unwrap();
-            match current.cmp(&range) {
-                Ordering::Less => {
-                    if let Some(next) = self.free_list.get(idx + 1) {
-                        if next > &range {
-                            if current.end + 1 == range.start && range.end + 1 == next.start {
-                                next.start = current.start;
-                                self.free_list.remove(idx);
-                            } else if current.end + 1 == range.start {
-                                current.end = range.end;
-                            } else if range.end + 1 == next.start {
-                                next.start = range.start;
-                            } else {
-                                self.free_list.insert(idx + 1, range);
-                            }
-                        }
-                    } else if current.end == range.start - 1 {
-                        current.end = range.end;
-                    } else {
-                        self.free_list.push(range);
-                    }
-                }
-                Ordering::Greater => {
-                    if let Some(prev) = self.free_list.get(idx.saturating_sub(1)) {
-                        if prev < &range {
-                            if prev.end + 1 == range.start && range.end + 1 == current.start {
-                                prev.end = current.end;
-                                self.free_list.remove(idx);
-                            } else if prev.end + 1 == range.start {
-                                prev.end = range.end;
-                            } else if range.end + 1 == current.start {
-                                current.start = range.start;
-                            } else {
-                                self.free_list.insert(idx, range)
-                            }
-                        }
-                    } else if range.end + 1 == current.start {
-                        current.start = range.start;
-                    } else {
-                        self.free_list.push(range);
-                    }
-                }
-                Ordering::Equal => unreachable!(),
-            }
-        }
+        // loop {
+        //     let current = self.free_list.get_mut(idx).unwrap();
+        //     match range.cmp(current) {
+        //         Ordering::Less => {
+        //             if let Some(next) = self.free_list.get(idx + 1) {
+        //                 if next > &range {
+        //                     if current.end + 1 == range.start && range.end + 1 == next.start {
+        //                         next.start = current.start;
+        //                         self.free_list.remove(idx);
+        //                     } else if current.end + 1 == range.start {
+        //                         current.end = range.end;
+        //                     } else if range.end + 1 == next.start {
+        //                         next.start = range.start;
+        //                     } else {
+        //                         self.free_list.insert(idx + 1, range);
+        //                     }
+        //                 }
+        //             } else if current.end == range.start - 1 {
+        //                 current.end = range.end;
+        //             } else {
+        //                 self.free_list.push(range);
+        //             }
+        //         }
+        //         Ordering::Greater => {
+        //             if let Some(prev) = self.free_list.get(idx.saturating_sub(1)) {
+        //                 if prev < &range {
+        //                     if prev.end + 1 == range.start && range.end + 1 == current.start {
+        //                         prev.end = current.end;
+        //                         self.free_list.remove(idx);
+        //                     } else if prev.end + 1 == range.start {
+        //                         prev.end = range.end;
+        //                     } else if range.end + 1 == current.start {
+        //                         current.start = range.start;
+        //                     } else {
+        //                         self.free_list.insert(idx, range)
+        //                     }
+        //                 }
+        //             } else if range.end + 1 == current.start {
+        //                 current.start = range.start;
+        //             } else {
+        //                 self.free_list.push(range);
+        //             }
+        //         }
+        //         Ordering::Equal => unreachable!(),
+        //     }
+        // }
     }
 }

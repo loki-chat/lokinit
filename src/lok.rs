@@ -50,17 +50,17 @@ pub trait LokinitBackend {
     #[cfg(feature = "opengl")]
     fn create_window_surface(&mut self, window: WindowHandle, cfg: OpenGlConfig) -> WindowSurface;
     #[cfg(feature = "opengl")]
-    fn load_opengl_func(&mut self, proc_name: *const c_char) -> Option<*mut c_void>;
+    fn load_opengl_func(&mut self, proc_name: *const c_char) -> *mut c_void;
     #[cfg(feature = "opengl")]
-    fn make_surface_active(&self, surface: WindowSurface);
+    fn make_surface_active(&self, window: WindowHandle, surface: WindowSurface);
     #[cfg(feature = "opengl")]
-    fn flush_surface(&self, surface: WindowSurface);
+    fn flush_surface(&self, window: WindowHandle, surface: WindowSurface);
     #[cfg(feature = "opengl")]
     fn update_surface(&self, surface: WindowSurface);
 }
 
 thread_local! {
-    static INSTANCE: RefCell<Option<DefaultLokinitBackend>> = RefCell::new(None);
+    static INSTANCE: RefCell<Option<DefaultLokinitBackend>> = const { RefCell::new(None) };
 }
 
 /// Initializes Lokinit with a default backend.
@@ -107,6 +107,6 @@ fn create_window_surface(window: WindowHandle, cfg: OpenGlConfig) -> WindowSurfa
     with(|instance| instance.create_window_surface(window, cfg))
 }
 #[cfg(feature = "opengl")]
-pub fn load_opengl_func(name: *const c_char) -> Option<*mut c_void> {
+pub fn load_opengl_func(name: *const c_char) -> *mut c_void {
     with(|instance| instance.load_opengl_func(name))
 }

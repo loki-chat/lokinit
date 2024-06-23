@@ -1,3 +1,5 @@
+#![cfg(target_os = "macos")]
+
 pub mod classes;
 pub mod dynload;
 pub mod enums;

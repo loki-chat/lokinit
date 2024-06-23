@@ -74,19 +74,42 @@ impl LokinitBackend for LinuxBackend {
         &mut self,
         handle: WindowHandle,
         config: OpenGlConfig,
-    ) -> GLSurface {
+    ) -> WindowSurface {
         match self {
             Self::X11(x11) => x11.create_window_surface(handle, config),
             Self::Wayland(wl) => wl.create_window_surface(handle, config),
         }
     }
 
+    #[cfg(feature = "opengl")]
     fn load_opengl_func(
         &mut self,
         proc_name: *const std::ffi::c_char,
-    ) -> Option<*mut std::ffi::c_void> {
-        todo!("load opengl func")
+    ) -> *mut std::ffi::c_void {
+        match self {
+            Self::X11(x11) => x11.load_opengl_func(proc_name),
+            Self::Wayland(wl) => wl.load_opengl_func(proc_name),
+        }
+    }
+
+    #[cfg(feature = "opengl")]
+    fn make_surface_active(&self, handle: WindowHandle, surface: super::WindowSurface) {
+        match self {
+            Self::X11(x11) => x11.make_surface_active(handle, surface),
+            Self::Wayland(wl) => wl.make_surface_active(handle, surface),
+        }
+    }
+
+    #[cfg(feature = "opengl")]
+    fn flush_surface(&self, handle: WindowHandle, surface: super::WindowSurface) {
+        match self {
+            Self::X11(x11) => x11.flush_surface(handle, surface),
+            Self::Wayland(wl) => wl.flush_surface(handle, surface),
+        }
+    }
+
+    #[cfg(feature = "opengl")]
+    fn update_surface(&self, surface: super::WindowSurface) {
+        todo!()
     }
 }
-
-type WindowSurface = ();

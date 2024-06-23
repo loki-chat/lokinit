@@ -17,7 +17,7 @@ mod types {
     pub type WindowId = usize;
 
     #[cfg(feature = "opengl")]
-    pub type WindowSurface = ();
+    pub type WindowSurface = linux::opengl::GlSurface;
 }
 #[cfg(target_os = "macos")]
 mod types {

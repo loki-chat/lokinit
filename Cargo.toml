@@ -31,7 +31,7 @@ loki-draw = { git = "https://github.com/loki-chat/loki-draw.git" }
 
 [features]
 default = ["opengl"]
-opengl = []
+opengl = ["loki-linux/glx"]
 
 [workspace]
 members = ["loki-linux", "loki-mac"]

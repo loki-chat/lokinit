@@ -6,14 +6,19 @@ use crate::{
     prelude::WindowHandle,
 };
 
-pub trait OpenGlSurface {
-    fn make_active(&self);
-    fn flush(&self);
-}
-
 impl WindowHandle {
     pub fn create_surface(&self, cfg: OpenGlConfig) -> WindowSurface {
         lok::with(|backend| backend.create_window_surface(*self, cfg))
+    }
+
+    #[cfg(feature = "opengl")]
+    pub fn make_surface_active(&self, surface: crate::native::WindowSurface) {
+        lok::with(|backend| backend.make_surface_active(*self, surface))
+    }
+
+    #[cfg(feature = "opengl")]
+    pub fn flush_surface(&self, surface: crate::native::WindowSurface) {
+        lok::with(|backend| backend.flush_surface(*self, surface))
     }
 }
 

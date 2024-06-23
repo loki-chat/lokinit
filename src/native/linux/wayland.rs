@@ -159,18 +159,31 @@ impl LokinitBackend for WaylandBackend {
     }
 
     #[cfg(feature = "opengl")]
-    fn load_opengl_func(
-        &mut self,
-        _proc_name: *const std::ffi::c_char,
-    ) -> Option<*mut std::ffi::c_void> {
+    fn load_opengl_func(&mut self, _proc_name: *const std::ffi::c_char) -> *mut std::ffi::c_void {
         todo!()
     }
+
     #[cfg(feature = "opengl")]
     fn create_window_surface(
         &mut self,
         _window: WindowHandle,
-        _cfg: crate::prelude::OpenGLConfig,
-    ) -> WindowSurface {
+        _cfg: crate::prelude::OpenGlConfig,
+    ) -> super::WindowSurface {
+        todo!()
+    }
+
+    #[cfg(feature = "opengl")]
+    fn make_surface_active(&self, window: WindowHandle, surface: crate::native::WindowSurface) {
+        todo!()
+    }
+
+    #[cfg(feature = "opengl")]
+    fn flush_surface(&self, window: WindowHandle, surface: super::WindowSurface) {
+        todo!()
+    }
+
+    #[cfg(feature = "opengl")]
+    fn update_surface(&self, surface: crate::native::WindowSurface) {
         todo!()
     }
 }

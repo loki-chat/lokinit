@@ -60,7 +60,7 @@ impl WaylandBackend {
                     .unwrap();
                 self.client.call_method(
                     &window.wl_surface,
-                    WlSurfaceMethod::Attach(Some(window.buffer), 0, 0),
+                    WlSurfaceMethod::Attach(Some(window.buffer.wl_buffer()), 0, 0),
                 );
                 self.client
                     .call_method(&xdg_surface, XdgSurfaceMethod::AckConfigure(serial));
