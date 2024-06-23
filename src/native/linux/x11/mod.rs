@@ -264,14 +264,14 @@ impl X11Backend {
                     b"_NET_WM_STATE_FULLSCREEN\0",
                 );
             }
-            ScreenMode::Borderless => {
+            ScreenMode::BorderlessFullscreen => {
                 self.send_wm_state_client_message(
                     window,
                     WmStateAction::Add,
                     b"_NET_WM_STATE_FULLSCREEN\0",
                 );
             }
-            ScreenMode::Fullscreen => {
+            ScreenMode::ExclusiveFullscreen => {
                 self.send_wm_state_client_message(
                     window,
                     WmStateAction::Add,

@@ -41,8 +41,8 @@ pub enum WindowBorder {
 pub enum ScreenMode {
     #[default]
     Windowed,
-    Borderless,
-    Fullscreen,
+    BorderlessFullscreen,
+    ExclusiveFullscreen,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -55,6 +55,7 @@ pub struct WindowBuilder {
     pub(crate) centered: bool,
     pub(crate) resizable: bool,
     pub(crate) maximized: bool,
+    pub(crate) decorations: bool,
     pub(crate) transparent: bool,
     pub(crate) high_dpi: bool,
 }
@@ -104,6 +105,11 @@ impl WindowBuilder {
         self
     }
 
+    pub fn decorations(mut self, has_decorations: bool) -> Self {
+        self.decorations = has_decorations;
+        self
+    }
+
     pub fn transparent(mut self, is_trans: bool) -> Self {
         self.transparent = is_trans;
         self
@@ -128,6 +134,7 @@ impl Default for WindowBuilder {
             centered: false,
             resizable: true,
             maximized: false,
+            decorations: true,
             transparent: false,
             high_dpi: false,
         }
