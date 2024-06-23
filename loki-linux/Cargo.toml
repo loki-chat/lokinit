@@ -10,3 +10,5 @@ edition = "2021"
 default = ["x11", "wayland"]
 x11 = []
 wayland = []
+glx = []
+egl = []

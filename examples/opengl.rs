@@ -37,7 +37,7 @@ fn main() {
     )
     .unwrap();
     println!("Creating surface");
-    let surface = window.create_surface(OpenGLConfig {});
+    let surface = window.create_surface(OpenGlConfig::default());
     println!("Making surface active");
     surface.make_active();
 

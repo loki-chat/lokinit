@@ -97,7 +97,7 @@ impl LokinitBackend for WaylandBackend {
     fn create_window_surface(
         &mut self,
         window: WindowHandle,
-        cfg: crate::prelude::OpenGLConfig,
+        cfg: crate::prelude::OpenGlConfig,
     ) -> GLSurface {
         todo!("create window surface")
     }

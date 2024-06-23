@@ -8,6 +8,9 @@ use x11::X11Backend;
 #[cfg(feature = "opengl")]
 use crate::gl::*;
 
+#[cfg(feature = "opengl")]
+pub mod opengl;
+
 pub mod wayland;
 pub mod x11;
 
@@ -69,10 +72,13 @@ impl LokinitBackend for LinuxBackend {
     #[cfg(feature = "opengl")]
     fn create_window_surface(
         &mut self,
-        window: WindowHandle,
-        cfg: crate::prelude::OpenGLConfig,
+        handle: WindowHandle,
+        config: OpenGlConfig,
     ) -> GLSurface {
-        todo!("create window surface")
+        match self {
+            Self::X11(x11) => x11.create_window_surface(handle, config),
+            Self::Wayland(wl) => wl.create_window_surface(handle, config),
+        }
     }
 
     fn load_opengl_func(

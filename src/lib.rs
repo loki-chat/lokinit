@@ -11,7 +11,7 @@ pub mod prelude {
         Event, EventKind, KeyboardEvent, MouseButton, MouseEvent, TouchEvent, TouchPhase,
     };
     #[cfg(feature = "opengl")]
-    pub use crate::gl::{OpenGLConfig, OpenGLSurface};
+    pub use crate::gl::{OpenGlConfig, OpenGlSurface};
     pub use crate::keycode::KeyCode;
     pub use crate::lok::{self, Monitor, MonitorId};
     pub use crate::native::DefaultLokinitBackend;

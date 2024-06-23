@@ -12,6 +12,7 @@ use crate::lok::CreateWindowError;
 use crate::prelude::{WindowBuilder, WindowHandle, WindowPos, WindowSize};
 use crate::window::ScreenMode;
 
+use loki_linux::glx::LibGlx;
 use loki_linux::locale::{setlocale, LC_CTYPE};
 use loki_linux::x11::{
     et, xclass, xcw, xevent_mask, xim, xn, Atom, LibX11, Status, XClientMessageData,
@@ -19,6 +20,8 @@ use loki_linux::x11::{
     XWindow, XID, X_BUFFER_OVERFLOW, _XIC, _XIM,
 };
 use loki_linux::LoadingError;
+
+use super::OpenGlConfig;
 
 mod keysym;
 
@@ -65,6 +68,9 @@ pub struct X11Backend {
     prev_key: Option<KeyCode>,
     str_buffer: Vec<u8>,
     n_windows: u32,
+
+    #[cfg(feature = "opengl")]
+    glx: LibGlx,
 }
 
 impl X11Backend {
@@ -103,6 +109,9 @@ impl X11Backend {
 
             (x11.XFlush)(display.as_ptr());
 
+            #[cfg(feature = "opengl")]
+            let glx = LibGlx::new()?;
+
             Ok(Self {
                 x11,
                 root,
@@ -113,6 +122,9 @@ impl X11Backend {
                 prev_key: None,
                 str_buffer: vec![0; 16],
                 n_windows: 0,
+
+                #[cfg(feature = "opengl")]
+                glx,
             })
         }
     }
@@ -278,6 +290,104 @@ impl X11Backend {
                     b"_NET_WM_STATE_FULLSCREEN\0",
                 );
             }
+        }
+    }
+
+    #[cfg(feature = "opengl")]
+    pub fn create_window_surface(
+        &self,
+        window: WindowHandle,
+        config: OpenGlConfig,
+    ) -> super::GLSurface {
+        use std::ptr;
+
+        use loki_linux::glx::{
+            self, GLXContext, GLXFBConfig, GLX_DRAWABLE_TYPE, GLX_RGBA_TYPE, GLX_X_RENDERABLE,
+        };
+        use loki_linux::x11;
+
+        use crate::native::linux::opengl::GlxSurface;
+
+        let glx_attribs = [
+            glx::GLX_X_RENDERABLE,
+            x11::bool::TRUE as u32,
+            glx::GLX_DRAWABLE_TYPE,
+            glx::GLX_WINDOW_BIT,
+            glx::GLX_RENDER_TYPE,
+            glx::GLX_RGBA_BIT,
+            glx::GLX_X_VISUAL_TYPE,
+            glx::GLX_TRUE_COLOR,
+            glx::GLX_RED_SIZE,
+            8,
+            glx::GLX_GREEN_SIZE,
+            8,
+            glx::GLX_BLUE_SIZE,
+            8,
+            glx::GLX_ALPHA_SIZE,
+            8,
+            glx::GLX_DEPTH_SIZE,
+            24,
+            glx::GLX_STENCIL_SIZE,
+            8,
+            glx::GLX_DOUBLEBUFFER,
+            x11::bool::TRUE as u32,
+            0,
+        ];
+
+        unsafe {
+            let mut fb_count = 0;
+            let fb_configs = (self.glx.glXChooseFBConfig)(
+                self.display.as_ptr(),
+                (self.x11.XDefaultScreen)(self.display.as_ptr()),
+                &glx_attribs as *const _ as *const i32,
+                &mut fb_count,
+            );
+
+            if fb_configs.is_null() || fb_count == 0 {
+                panic!("no GLX framebuffer config available");
+            }
+
+            let fb_config: GLXFBConfig = *fb_configs;
+            (self.x11.XFree)(fb_configs as *mut _);
+
+            let visual_info = (self.glx.glXGetVisualFromFBConfig)(self.display.as_ptr(), fb_config);
+
+            let mut new_attributes = XSetWindowAttributes {
+                colormap: (self.x11.XCreateColormap)(
+                    self.display.as_ptr(),
+                    window.into(),
+                    (*visual_info).visual,
+                    0,
+                ),
+                ..Default::default()
+            };
+            (self.x11.XChangeWindowAttributes)(
+                self.display.as_ptr(),
+                window.into(),
+                xcw::COLORMAP,
+                &mut new_attributes,
+            );
+
+            let mut major: i32 = 0;
+            let mut minor: i32 = 0;
+            (self.glx.glXQueryVersion)(self.display.as_ptr(), &mut major, &mut minor);
+            println!("GLX version: {major}.{minor}");
+
+            let context: GLXContext = (self.glx.glXCreateNewContext)(
+                self.display.as_ptr(),
+                fb_config,
+                glx::GLX_RGBA_TYPE as i32,
+                ptr::null_mut(),
+                1,
+            );
+
+            if (self.glx.glXIsDirect)(self.display.as_ptr(), context) != 0 {
+                println!("glx context is direct");
+            } else {
+                println!("glx context is indirect");
+            }
+
+            GlxSurface(context)
         }
     }
 

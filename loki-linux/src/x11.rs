@@ -38,6 +38,7 @@ pub type Colormap = XID;
 pub type Cursor = XID;
 pub type Pixmap = XID;
 pub type KeySym = XID;
+pub type Font = XID;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -167,6 +168,21 @@ pub struct XSetWindowAttributes {
     pub colormap: Colormap,
     pub cursor: Cursor,
 }
+
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct XVisualInfo {
+    pub visual: *mut Visual,
+    pub visualid: VisualID,
+    pub screen: c_int,
+    pub depth: c_int,
+    pub class: c_int,
+    pub red_mask: c_ulong,
+    pub green_mask: c_ulong,
+    pub blue_mask: c_ulong,
+    pub colormap_size: c_int,
+    pub bits_per_rgb: c_int,
+  }
 
 pub mod errcode {
     use std::ffi::c_int;
@@ -408,6 +424,10 @@ library! {
         nelements: c_int
     );
     pub fn XDeleteProperty(display: *mut XDisplay, win: XWindow, property: Atom);
+
+    pub fn XChangeWindowAttributes(display: *mut XDisplay, win: XWindow, value_mask: c_ulong, attributes: *mut XSetWindowAttributes) -> c_int;
+
+    pub fn XCreateColormap(display: *mut XDisplay, win: XWindow, visual: *mut Visual, alloc: c_int) -> Colormap;
 
     pub fn XMapWindow(display: *mut XDisplay, window: XWindow);
     pub fn XUnmapWindow(display: *mut XDisplay, window: XWindow);

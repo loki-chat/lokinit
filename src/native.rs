@@ -24,6 +24,9 @@ pub use ios;
 #[cfg(target_os = "linux")]
 pub type DefaultLokinitBackend = linux::LinuxBackend;
 
+#[cfg(all(target_os = "linux", feature = "opengl"))]
+pub type GLSurface = linux::opengl::GlxSurface;
+
 #[cfg(target_os = "macos")]
 pub type DefaultLokinitBackend = macos::MacosBackend;
 

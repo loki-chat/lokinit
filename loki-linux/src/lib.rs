@@ -8,8 +8,15 @@ use dl::{dlopen, dlsym, get_dlerror, RTLD_NOW};
 
 pub mod dl;
 pub mod locale;
+
+#[cfg(feature = "wayland")]
 pub mod wayland;
+
+#[cfg(feature = "x11")]
 pub mod x11;
+
+#[cfg(feature = "glx")]
+pub mod glx;
 
 /// A wrapper for all the dl methods
 pub struct Library {
