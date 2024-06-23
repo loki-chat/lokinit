@@ -54,7 +54,7 @@ fn main() {
                     match keycode {
                         KeyCode::F => {
                             println!("[{win:?}] FULLSCREEN");
-                            lok::set_screen_mode(win, ScreenMode::Fullscreen);
+                            lok::set_screen_mode(win, ScreenMode::BorderlessFullscreen);
                         }
                         KeyCode::W => {
                             println!("[{win:?}] WINDOWED");

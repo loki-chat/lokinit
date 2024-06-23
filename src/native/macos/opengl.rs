@@ -1,5 +1,5 @@
 use crate::{
-    gl::OpenGLSurface,
+    gl::OpenGlSurface,
     lok::{self, LokinitBackend},
     prelude::WindowHandle,
 };
@@ -8,7 +8,7 @@ use crate::{
 pub struct WindowSurface {
     pub(crate) window: WindowHandle,
 }
-impl OpenGLSurface for WindowSurface {
+impl OpenGlSurface for WindowSurface {
     fn make_active(&self) {
         lok::with(|backend| {
             backend.make_surface_active(*self);

@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use crate::{native::DefaultLokinitBackend, window::ScreenMode};
 #[cfg(feature = "opengl")]
 use {
-    crate::gl::{OpenGLConfig, WindowSurface},
+    crate::gl::{OpenGlConfig, WindowSurface},
     std::ffi::{c_char, c_void},
 };
 
@@ -48,7 +48,7 @@ pub trait LokinitBackend {
     fn fetch_monitors(&mut self) -> Vec<Monitor>;
 
     #[cfg(feature = "opengl")]
-    fn create_window_surface(&mut self, window: WindowHandle, cfg: OpenGLConfig) -> WindowSurface;
+    fn create_window_surface(&mut self, window: WindowHandle, cfg: OpenGlConfig) -> WindowSurface;
     #[cfg(feature = "opengl")]
     fn load_opengl_func(&mut self, proc_name: *const c_char) -> Option<*mut c_void>;
     #[cfg(feature = "opengl")]
@@ -103,7 +103,7 @@ pub fn fetch_monitors() -> Vec<Monitor> {
 }
 
 #[cfg(feature = "opengl")]
-fn create_window_surface(window: WindowHandle, cfg: OpenGLConfig) -> WindowSurface {
+fn create_window_surface(window: WindowHandle, cfg: OpenGlConfig) -> WindowSurface {
     with(|instance| instance.create_window_surface(window, cfg))
 }
 #[cfg(feature = "opengl")]

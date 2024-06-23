@@ -12,7 +12,7 @@ pub trait OpenGlSurface {
 }
 
 impl WindowHandle {
-    pub fn create_surface(&self, cfg: OpenGLConfig) -> WindowSurface {
+    pub fn create_surface(&self, cfg: OpenGlConfig) -> WindowSurface {
         lok::with(|backend| backend.create_window_surface(*self, cfg))
     }
 }

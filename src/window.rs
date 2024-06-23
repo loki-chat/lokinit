@@ -60,6 +60,7 @@ pub struct WindowBuilder {
     pub maximized: bool,
     pub transparent: bool,
     pub high_dpi: bool,
+    pub decorations: bool,
 }
 
 impl WindowBuilder {

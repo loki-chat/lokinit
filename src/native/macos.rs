@@ -171,7 +171,7 @@ impl LokinitBackend for MacosBackend {
     fn create_window_surface(
         &mut self,
         window_handle: WindowHandle,
-        _cfg: OpenGLConfig,
+        _cfg: OpenGlConfig,
     ) -> WindowSurface {
         let window = self.windows.get_mut(&window_handle.0).unwrap();
         let view = window.content_view();
