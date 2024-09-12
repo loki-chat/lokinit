@@ -34,9 +34,13 @@ mod libc {
         pub unsafe fn create(len: usize) -> std::io::Result<Self> {
             let mut fd = memfd_create(
                 c"buffer".as_ptr(),
-                MFD_HUGEPAGE | MFD_HUGETLB | HUGETLB_FLAG_ENCODE_8MB,
+                if len >= 1024 * 1024 * 8 {
+                    MFD_HUGEPAGE | MFD_HUGETLB | HUGETLB_FLAG_ENCODE_8MB
+                } else {
+                    0
+                },
             );
-            if fd == -1 {
+            if fd == -1 && len >= 1024 * 1024 * 8 {
                 eprintln!("Failed to initialize memfd with huge pages");
                 fd = memfd_create(c"buffer".as_ptr(), 0);
             }
@@ -217,49 +221,135 @@ struct Point {
     len: usize,
 }
 
-static FREE_POOL_ID: AtomicU16 = AtomicU16::new(0);
+#[derive(Default)]
+pub struct ShmAllocatorAllocator {
+    allocators: Vec<Option<ShmAllocator>>,
+    cleanup: bool,
+}
+impl ShmAllocatorAllocator {
+    pub fn allocate(
+        &mut self,
+        client: &mut WaylandClient,
+        image_info: ImageInfo,
+    ) -> std::io::Result<Buffer> {
+        let len = image_info.len();
+
+        if len == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Cannot allocate ZSTs",
+            ));
+        }
+
+        for x in self.allocators.iter_mut() {
+            if let Some(alloc) = x {
+                if alloc.full_size() < len {
+                    if alloc.buffer_count() == 0 {
+                        x.take();
+                    }
+                    continue;
+                }
+
+                if let Ok(x) = alloc.allocate(client, image_info) {
+                    return Ok(x);
+                } else {
+                    if alloc.buffer_count() == 0 {
+                        x.take();
+                    }
+                    continue;
+                }
+            }
+        }
+
+        let free_id = self
+            .allocators
+            .iter()
+            .enumerate()
+            .find(|(_, x)| x.is_none())
+            .map(|x| x.0)
+            .unwrap_or(self.allocators.len());
+
+        let mut size = 1024 * 1024 * 4;
+        while size < len {
+            size *= 2;
+        }
+
+        println!(
+            "[ShmAllocatorAllocator#allocate] No suitable buffer found, allocating a new one (size={size}B, bufsize={len}B)",
+        );
+
+        let alloc = ShmAllocator::new(
+            size,
+            client,
+            free_id
+                .try_into()
+                .expect("Holy shit why do you need so many buffers?"),
+        )?;
+
+        if free_id == self.allocators.len() {
+            self.allocators.push(Some(alloc));
+        } else {
+            self.allocators.get_mut(free_id).unwrap().replace(alloc);
+        }
+
+        let v = self
+            .allocators
+            .get_mut(free_id)
+            .unwrap()
+            .as_mut()
+            .unwrap()
+            .allocate(client, image_info);
+
+        // Just in case there're any empty allocators at the end of the list
+        if self.cleanup {
+            self.cleanup = false;
+            for x in self.allocators.iter_mut() {
+                if x.as_ref().is_some_and(|x| x.buffer_count() == 0) {
+                    x.take();
+                }
+            }
+        }
+
+        v
+    }
+
+    pub fn free(
+        &mut self,
+        client: &mut WaylandClient,
+        buffer: Buffer,
+    ) -> Result<(), (std::io::Error, Buffer)> {
+        match self
+            .allocators
+            .get_mut(buffer.pool_id as usize)
+            .and_then(|x| x.as_mut())
+        {
+            Some(x) => {
+                let v = x.free(client, buffer);
+                if x.buffer_count() == 0 {
+                    self.cleanup = true;
+                }
+                v
+            }
+            None => Err((
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "Trying to deallocate a foreign buffer",
+                ),
+                buffer,
+            )),
+        }
+    }
+}
 
 pub struct ShmAllocator {
-    //pub file: File,
-    //pub pool: WlShmPool,
-    //size: usize,
-    //free_list: Vec<Range>,
     memmap: libc::MemMap,
     allocated: Vec<Point>,
     pool: WlShmPool,
     pool_id: u16,
+    buffers: u16,
 }
 impl ShmAllocator {
-    pub fn new(size: usize, client: &mut WaylandClient) -> std::io::Result<Self> {
-        //let shm_file_dir = env::var("XDG_RUNTIME_DIR")
-        //    .ok()
-        //    .unwrap_or("/tmp".to_string());
-        //let file = create_tmpfile(OpenOptions::new().write(true).read(true))
-        //    .open(shm_file_dir)
-        //    .ok()?;
-
-        //let shm: WlShm = client.get_global();
-        //file.set_len(size).unwrap();
-        //let pool = shm.create_pool(
-        //    client,
-        //    Fd {
-        //        raw: file.as_raw_fd(),
-        //    },
-        //    size as _,
-        //);
-
-        //let free_list = vec![Range {
-        //    start: 0,
-        //    end: size,
-        //}];
-
-        //Some(Self {
-        //    file,
-        //    pool,
-        //    size,
-        //    free_list,
-        //})
-
+    pub fn new(size: usize, client: &mut WaylandClient, pool_id: u16) -> std::io::Result<Self> {
         let memmap = unsafe { libc::MemMap::create(size) }?;
         let shm: WlShm = client.get_global();
         let pool = shm.create_pool(
@@ -272,8 +362,17 @@ impl ShmAllocator {
             memmap,
             pool,
             allocated: Vec::with_capacity(64),
-            pool_id: FREE_POOL_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            pool_id,
+            buffers: 0,
         })
+    }
+
+    pub fn full_size(&self) -> usize {
+        self.memmap.len()
+    }
+
+    pub fn buffer_count(&self) -> u16 {
+        self.buffers
     }
 
     pub fn allocate(
@@ -319,6 +418,7 @@ impl ShmAllocator {
         );
 
         self.allocated.insert(i, Point { ptr, len });
+        self.buffers += 1;
 
         Ok(Buffer {
             wl_buffer,
@@ -360,55 +460,10 @@ impl ShmAllocator {
             )),
             1 => {
                 client.call_method(&wl_buffer, WlBufferMethod::Destroy);
+                self.buffers -= 1;
                 Ok(())
             }
             x => panic!("Shm allocator error! Deallocated {x} objects!"),
         }
-        // loop {
-        //     let current = self.free_list.get_mut(idx).unwrap();
-        //     match range.cmp(current) {
-        //         Ordering::Less => {
-        //             if let Some(next) = self.free_list.get(idx + 1) {
-        //                 if next > &range {
-        //                     if current.end + 1 == range.start && range.end + 1 == next.start {
-        //                         next.start = current.start;
-        //                         self.free_list.remove(idx);
-        //                     } else if current.end + 1 == range.start {
-        //                         current.end = range.end;
-        //                     } else if range.end + 1 == next.start {
-        //                         next.start = range.start;
-        //                     } else {
-        //                         self.free_list.insert(idx + 1, range);
-        //                     }
-        //                 }
-        //             } else if current.end == range.start - 1 {
-        //                 current.end = range.end;
-        //             } else {
-        //                 self.free_list.push(range);
-        //             }
-        //         }
-        //         Ordering::Greater => {
-        //             if let Some(prev) = self.free_list.get(idx.saturating_sub(1)) {
-        //                 if prev < &range {
-        //                     if prev.end + 1 == range.start && range.end + 1 == current.start {
-        //                         prev.end = current.end;
-        //                         self.free_list.remove(idx);
-        //                     } else if prev.end + 1 == range.start {
-        //                         prev.end = range.end;
-        //                     } else if range.end + 1 == current.start {
-        //                         current.start = range.start;
-        //                     } else {
-        //                         self.free_list.insert(idx, range)
-        //                     }
-        //                 }
-        //             } else if range.end + 1 == current.start {
-        //                 current.start = range.start;
-        //             } else {
-        //                 self.free_list.push(range);
-        //             }
-        //         }
-        //         Ordering::Equal => unreachable!(),
-        //     }
-        // }
     }
 }

@@ -10,7 +10,7 @@ use {
         hashnt::Hashnt,
         wayland::{interfaces::all::*, methods::*, wire::Id, WaylandClient},
     },
-    shm::{Buffer, ImageInfo, ShmAllocator},
+    shm::{Buffer, ImageInfo, ShmAllocatorAllocator},
     std::{
         cell::{Cell, OnceCell},
         collections::{HashMap, VecDeque},
@@ -28,7 +28,7 @@ pub struct WaylandBackend {
     pub event_queue: VecDeque<Event>,
     pub windows: Vec<Option<WaylandWindow>>,
     pub object_to_window_map: HashMap<Id, WindowId, Hashnt>,
-    pub shm: OnceCell<ShmAllocator>,
+    pub shm: OnceCell<ShmAllocatorAllocator>,
 }
 
 impl WaylandBackend {
@@ -44,11 +44,7 @@ impl WaylandBackend {
         };
 
         this.roundtrip();
-        if this
-            .shm
-            .set(ShmAllocator::new(1024 * 1024 * 16, &mut this.client)?)
-            .is_err()
-        {
+        if this.shm.set(ShmAllocatorAllocator::default()).is_err() {
             unreachable!();
         }
 
