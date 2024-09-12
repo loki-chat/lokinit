@@ -42,7 +42,7 @@ pub enum WlShmMethod {
 }
 
 pub enum WlBufferMethod {
-    Destroy = 0
+    Destroy = 0,
 }
 
 pub enum WlSurfaceMethod {

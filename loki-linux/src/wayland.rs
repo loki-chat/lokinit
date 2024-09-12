@@ -47,8 +47,10 @@ impl WaylandClient {
     /// Tries to connect to a Wayland compositor. If successful, creates and returns
     /// a [`WaylandClient`]. This will also automatically create a [`WlRegistry`] singleton
     /// with an object ID of 2, and then perform a [`Self::roundtrip`].
-    pub fn new() -> Option<Self> {
-        let socket = Self::find_compositor()?;
+    pub fn new() -> std::io::Result<Self> {
+        let socket = Self::find_compositor().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::NotFound, "Could not find a compositor")
+        })?;
 
         let mut this = Self {
             socket,
@@ -72,7 +74,7 @@ impl WaylandClient {
         this.objects.push(Some(Interface::WlRegistry));
         this.globals.insert(Interface::WlRegistry, Id { raw: 2 });
 
-        Some(this)
+        Ok(this)
     }
 
     /// Attempts to locate the Wayland compositor. This method is taken from:

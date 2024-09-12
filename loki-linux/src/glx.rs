@@ -125,53 +125,53 @@ library! {
 
     pub fn glXChooseVisual(display: *mut XDisplay, screen: c_int, attrib_list: *mut c_int) -> *mut XVisualInfo;
     pub fn glXCreateContext(display: *mut XDisplay, vis: *mut XVisualInfo, share_list: GLXContext, direct: Bool) -> *mut XVisualInfo;
-	pub fn glXDestroyContext(display: *mut XDisplay, ctx: GLXContext);
-	pub fn glXMakeCurrent(display: *mut XDisplay, drawable: GLXDrawable, ctx: GLXContext) -> Bool;
-	pub fn glXCopyContext(display: *mut XDisplay, src: GLXContext, dst: GLXContext, mask: c_ulong);
-	pub fn glXSwapBuffers(display: *mut XDisplay, drawable: GLXDrawable);
-	pub fn glXCreateGLXPixmap(display: *mut XDisplay, visual: *mut XVisualInfo, pixmap: Pixmap) -> GLXPixmap;
-	pub fn glXDestroyGLXPixmap(display: *mut XDisplay, pixmap: GLXPixmap);
-	pub fn glXQueryExtension(display: *mut XDisplay, errorb: *mut c_int, event: *mut c_int) -> Bool;
-	pub fn glXQueryVersion(display: *mut XDisplay, maj: *mut c_int, min: *mut c_int) -> Bool;
-	pub fn glXIsDirect(display: *mut XDisplay, ctx: GLXContext) -> Bool;
-	pub fn glXGetConfig(display: *mut XDisplay, visual: *mut XVisualInfo, attrib: c_int, value: *mut c_int) -> c_int;
-	pub fn glXGetCurrentContext() -> GLXContext;
-	pub fn glXGetCurrentDrawable() -> GLXDrawable;
-	pub fn glXWaitGL();
-	pub fn glXWaitX();
-	pub fn glXUseXFont(font: Font, first: c_int, count: c_int, list: c_int);
+    pub fn glXDestroyContext(display: *mut XDisplay, ctx: GLXContext);
+    pub fn glXMakeCurrent(display: *mut XDisplay, drawable: GLXDrawable, ctx: GLXContext) -> Bool;
+    pub fn glXCopyContext(display: *mut XDisplay, src: GLXContext, dst: GLXContext, mask: c_ulong);
+    pub fn glXSwapBuffers(display: *mut XDisplay, drawable: GLXDrawable);
+    pub fn glXCreateGLXPixmap(display: *mut XDisplay, visual: *mut XVisualInfo, pixmap: Pixmap) -> GLXPixmap;
+    pub fn glXDestroyGLXPixmap(display: *mut XDisplay, pixmap: GLXPixmap);
+    pub fn glXQueryExtension(display: *mut XDisplay, errorb: *mut c_int, event: *mut c_int) -> Bool;
+    pub fn glXQueryVersion(display: *mut XDisplay, maj: *mut c_int, min: *mut c_int) -> Bool;
+    pub fn glXIsDirect(display: *mut XDisplay, ctx: GLXContext) -> Bool;
+    pub fn glXGetConfig(display: *mut XDisplay, visual: *mut XVisualInfo, attrib: c_int, value: *mut c_int) -> c_int;
+    pub fn glXGetCurrentContext() -> GLXContext;
+    pub fn glXGetCurrentDrawable() -> GLXDrawable;
+    pub fn glXWaitGL();
+    pub fn glXWaitX();
+    pub fn glXUseXFont(font: Font, first: c_int, count: c_int, list: c_int);
 
-	// GLX 1.1 and later
+    // GLX 1.1 and later
 
-	pub fn glXQueryExtensionsString(display: *mut XDisplay, screen: c_int) -> *const c_char;
-	pub fn glXQueryServerString(display: *mut XDisplay, screen: c_int, name: c_int) -> *const c_char;
-	pub fn glXGetClientString(display: *mut XDisplay, name: c_int) -> *const c_char;
+    pub fn glXQueryExtensionsString(display: *mut XDisplay, screen: c_int) -> *const c_char;
+    pub fn glXQueryServerString(display: *mut XDisplay, screen: c_int, name: c_int) -> *const c_char;
+    pub fn glXGetClientString(display: *mut XDisplay, name: c_int) -> *const c_char;
 
-	// GLX 1.2 and later
+    // GLX 1.2 and later
 
-	pub fn glXGetCurrentDisplay() -> *mut XDisplay;
+    pub fn glXGetCurrentDisplay() -> *mut XDisplay;
 
-	// GLX 1.3 and later
+    // GLX 1.3 and later
 
-	pub fn glXChooseFBConfig(display: *mut XDisplay, screen: c_int, attrib_list: *const c_int, nitems: *mut c_int) -> *mut GLXFBConfig;
-	pub fn glXGetFBConfigAttrib(display: *mut XDisplay, config: GLXFBConfig, attribute: c_int, value: *mut c_int) -> c_int;
-	pub fn glXGetFBConfigs(display: *mut XDisplay, screen: c_int, nelements: *mut c_int) -> *mut GLXFBConfig;
-	pub fn glXGetVisualFromFBConfig(display: *mut XDisplay, config: GLXFBConfig) -> *mut XVisualInfo;
-	pub fn glXCreateWindow(display: *mut XDisplay, config: GLXFBConfig, window: XWindow, attrib_list: *const c_int) -> GLXWindow;
-	pub fn glXDestroyWindow(display: *mut XDisplay, window: GLXWindow);
-	pub fn glXCreatePixmap(display: *mut XDisplay, config: GLXFBConfig, pixmap: Pixmap, attrib_list: *const c_int) -> GLXPixmap;
-	pub fn glXDestroyPixmap(display: *mut XDisplay, pixmap: GLXPixmap);
-	pub fn glXCreatePbuffer(display: *mut XDisplay, config: GLXFBConfig, attrib_list: *const c_int) -> GLXPbuffer;
-	pub fn glXDestroyPbuffer(display: *mut XDisplay, pbuf: GLXPbuffer);
-	pub fn glXQueryDrawable(display: *mut XDisplay, draw: GLXDrawable, attribute: c_int, value: *mut c_uint);
-	pub fn glXCreateNewContext(display: *mut XDisplay, config: GLXFBConfig, render_type: c_int, share_list: GLXContext, direct: Bool) -> GLXContext;
-	pub fn glXMakeContextCurrent(display: *mut XDisplay, draw: GLXDrawable, read: GLXDrawable, ctx: GLXContext) -> Bool;
-	pub fn glXGetCurrentReadDrawable() -> GLXDrawable;
-	pub fn glXQueryContext(display: *mut XDisplay, ctx: GLXContext, attribute: c_int, value: *mut c_int) -> c_int;
-	pub fn glXSelectEvent(display: *mut XDisplay, drawable: GLXDrawable, mask: c_ulong);
-	pub fn glXGetSelectedEvent(display: *mut XDisplay, drawable: GLXDrawable, mask: *mut c_ulong);
+    pub fn glXChooseFBConfig(display: *mut XDisplay, screen: c_int, attrib_list: *const c_int, nitems: *mut c_int) -> *mut GLXFBConfig;
+    pub fn glXGetFBConfigAttrib(display: *mut XDisplay, config: GLXFBConfig, attribute: c_int, value: *mut c_int) -> c_int;
+    pub fn glXGetFBConfigs(display: *mut XDisplay, screen: c_int, nelements: *mut c_int) -> *mut GLXFBConfig;
+    pub fn glXGetVisualFromFBConfig(display: *mut XDisplay, config: GLXFBConfig) -> *mut XVisualInfo;
+    pub fn glXCreateWindow(display: *mut XDisplay, config: GLXFBConfig, window: XWindow, attrib_list: *const c_int) -> GLXWindow;
+    pub fn glXDestroyWindow(display: *mut XDisplay, window: GLXWindow);
+    pub fn glXCreatePixmap(display: *mut XDisplay, config: GLXFBConfig, pixmap: Pixmap, attrib_list: *const c_int) -> GLXPixmap;
+    pub fn glXDestroyPixmap(display: *mut XDisplay, pixmap: GLXPixmap);
+    pub fn glXCreatePbuffer(display: *mut XDisplay, config: GLXFBConfig, attrib_list: *const c_int) -> GLXPbuffer;
+    pub fn glXDestroyPbuffer(display: *mut XDisplay, pbuf: GLXPbuffer);
+    pub fn glXQueryDrawable(display: *mut XDisplay, draw: GLXDrawable, attribute: c_int, value: *mut c_uint);
+    pub fn glXCreateNewContext(display: *mut XDisplay, config: GLXFBConfig, render_type: c_int, share_list: GLXContext, direct: Bool) -> GLXContext;
+    pub fn glXMakeContextCurrent(display: *mut XDisplay, draw: GLXDrawable, read: GLXDrawable, ctx: GLXContext) -> Bool;
+    pub fn glXGetCurrentReadDrawable() -> GLXDrawable;
+    pub fn glXQueryContext(display: *mut XDisplay, ctx: GLXContext, attribute: c_int, value: *mut c_int) -> c_int;
+    pub fn glXSelectEvent(display: *mut XDisplay, drawable: GLXDrawable, mask: c_ulong);
+    pub fn glXGetSelectedEvent(display: *mut XDisplay, drawable: GLXDrawable, mask: *mut c_ulong);
 
-	// GLX 1.4 and later
+    // GLX 1.4 and later
 
-	pub fn glXGetProcAddress(proc_name: *const u8) -> *mut c_void;
+    pub fn glXGetProcAddress(proc_name: *const u8) -> *mut c_void;
 }

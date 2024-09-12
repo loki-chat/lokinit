@@ -31,6 +31,7 @@ impl WaylandBackend {
 
             WaylandEvent::WlRegistryEvent(registry_event) => match registry_event {
                 WlRegistryEvent::Global(_, name, interface, _version) => {
+                    println!("Trying to register object {}", interface.as_str());
                     match interface.as_str() {
                         "wl_compositor" => {
                             self.client.bind_global::<WlCompositor>(name);

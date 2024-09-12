@@ -182,7 +182,7 @@ pub struct XVisualInfo {
     pub blue_mask: c_ulong,
     pub colormap_size: c_int,
     pub bits_per_rgb: c_int,
-  }
+}
 
 pub mod errcode {
     use std::ffi::c_int;

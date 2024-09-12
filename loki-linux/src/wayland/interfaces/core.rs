@@ -137,6 +137,7 @@ impl WlCallback {
         Self { id }
     }
 }
+
 impl WlCompositor {
     pub fn create_surface(&self, client: &mut WaylandClient) -> WlSurface {
         let id = client.next_object_id();
@@ -153,6 +154,7 @@ impl WlCompositor {
         WlRegion { id }
     }
 }
+
 impl WlShm {
     pub fn create_pool(&self, client: &mut WaylandClient, fd: Fd, size: i32) -> WlShmPool {
         let id = client.next_object_id();
@@ -162,6 +164,7 @@ impl WlShm {
         WlShmPool { id }
     }
 }
+
 impl WlShmPool {
     pub fn create_buffer(
         &self,

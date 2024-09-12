@@ -8,21 +8,12 @@ use {
     },
     loki_linux::{
         hashnt::Hashnt,
-        wayland::{
-            events::WaylandEvent,
-            interfaces::all::*,
-            methods::*,
-            wire::{Fd, Id},
-            WaylandClient,
-        },
+        wayland::{interfaces::all::*, methods::*, wire::Id, WaylandClient},
     },
-    shm::{Buffer, ShmAllocator},
+    shm::{Buffer, ImageInfo, ShmAllocator},
     std::{
         cell::{Cell, OnceCell},
         collections::{HashMap, VecDeque},
-        env,
-        fs::{File, OpenOptions},
-        os::fd::AsRawFd,
         rc::Rc,
         thread,
         time::Duration,
@@ -41,7 +32,7 @@ pub struct WaylandBackend {
 }
 
 impl WaylandBackend {
-    pub fn new() -> Option<Self> {
+    pub fn new() -> std::io::Result<Self> {
         let client = WaylandClient::new()?;
 
         let mut this = Self {
@@ -53,11 +44,17 @@ impl WaylandBackend {
         };
 
         this.roundtrip();
-        this.shm.set(ShmAllocator::new(1, &mut this.client)?);
+        if this
+            .shm
+            .set(ShmAllocator::new(1024 * 1024 * 16, &mut this.client)?)
+            .is_err()
+        {
+            unreachable!();
+        }
 
         println!("Finished lokinit init");
 
-        Some(this)
+        Ok(this)
     }
 
     /// Sends a [`WlDisplayMethod::Sync`] event to the compositor, and blocks the thread until
@@ -101,7 +98,20 @@ impl LokinitBackend for WaylandBackend {
             wl_surface,
             xdg_surface,
             xdg_toplevel,
-            buffer: self.shm.get_mut().unwrap().allocate(&self.client, 1),
+            buffer: self
+                .shm
+                .get_mut()
+                .unwrap()
+                .allocate(
+                    &mut self.client,
+                    ImageInfo::new(
+                        builder.size.width,
+                        builder.size.height,
+                        shm::Format::Argb8888,
+                    )
+                    .ok_or_else(|| CreateWindowError("Failed to allocate image info".into()))?,
+                )
+                .map_err(|x| CreateWindowError(x.to_string().into()))?,
         };
 
         self.client

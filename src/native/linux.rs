@@ -26,10 +26,10 @@ impl LokinitBackend for LinuxBackend {
             Ok(x) if x == "x11" => Self::X11(X11Backend::init().unwrap()),
 
             _ => match WaylandBackend::new() {
-                Some(x) => Self::Wayland(x),
-                None => {
+                Ok(x) => Self::Wayland(x),
+                Err(why) => {
                     eprintln!(
-                        "Lokinit: Failed to initialize Wayland backend, falling back on X11..."
+                        "Lokinit: Failed to initialize Wayland backend, falling back on X11\n\n{why}"
                     );
                     Self::X11(X11Backend::init().unwrap())
                 }
@@ -82,10 +82,7 @@ impl LokinitBackend for LinuxBackend {
     }
 
     #[cfg(feature = "opengl")]
-    fn load_opengl_func(
-        &mut self,
-        proc_name: *const std::ffi::c_char,
-    ) -> *mut std::ffi::c_void {
+    fn load_opengl_func(&mut self, proc_name: *const std::ffi::c_char) -> *mut std::ffi::c_void {
         match self {
             Self::X11(x11) => x11.load_opengl_func(proc_name),
             Self::Wayland(wl) => wl.load_opengl_func(proc_name),
